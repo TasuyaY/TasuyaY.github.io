@@ -39,10 +39,37 @@
                     <span class="btn-text">極み</span>
                     <span class="btn-desc">究極の挑戦</span>
                 </button>
+                <button class="btn btn-help" id="start-help-btn">
+                    <span class="btn-text">操作方法について</span>
+                </button>
                 <button class="btn btn-exit" id="exit-btn">
                     <span class="btn-text">ゲーム終了</span>
                 </button>
             </div>
+        </div>
+
+        <!-- スキル選択画面 -->
+        <div id="skill-select-screen" class="screen">
+            <h2 class="screen-title">スキル選択</h2>
+            <p class="screen-desc">ゲームで使用するスキルを3つ選んでください</p>
+
+            <div class="selected-skills-container">
+                <div class="selected-skill-slot" data-slot="0">空き</div>
+                <div class="selected-skill-slot" data-slot="1">空き</div>
+                <div class="selected-skill-slot" data-slot="2">空き</div>
+            </div>
+
+            <div class="skills-list-container" id="skills-list">
+                <!-- JavaScriptで動的に生成 -->
+            </div>
+
+            <button class="btn btn-start disabled" id="game-start-btn">
+                <span class="btn-text">ゲーム開始</span>
+            </button>
+
+            <button class="btn btn-back" id="back-to-difficulty-btn">
+                <span class="btn-text">戻る</span>
+            </button>
         </div>
 
         <!-- ゲーム画面 -->
@@ -68,36 +95,15 @@
                         <span class="hud-label">オーブ</span>
                         <span class="hud-value orb-value" id="orb-value">0</span>
                     </div>
-                    <button class="btn-pause" id="pause-btn">⏸</button>
                 </div>
+            </div>
+            <div id="combo-container" style="display: none;">
+                <span id="combo-value">0 COMBO</span>
+                <span id="combo-bonus">+0%</span>
             </div>
             <canvas id="game-canvas"></canvas>
             <div id="skill-bar">
-                <button class="skill-btn" id="skill-penetrate" data-skill="penetrate" disabled>
-                    <div class="skill-key">Q</div>
-                    <div class="skill-icon">🔥</div>
-                    <div class="skill-name">貫通</div>
-                    <div class="skill-cost">30</div>
-                </button>
-                <button class="skill-btn" id="skill-explode" data-skill="explode" disabled>
-                    <div class="skill-key">E</div>
-                    <div class="skill-icon">💥</div>
-                    <div class="skill-name">爆破</div>
-                    <div class="skill-cost">50</div>
-                </button>
-                <button class="skill-btn" id="skill-bar-explode" data-skill="barExplode" disabled>
-                    <div class="skill-key">R</div>
-                    <div class="skill-icon">💣</div>
-                    <div class="skill-name">バー爆破</div>
-                    <div class="skill-cost">100</div>
-                </button>
-                <div class="skill-separator"></div>
-                <button class="skill-btn skill-cancel" id="skill-cancel" disabled>
-                    <div class="skill-key">C</div>
-                    <div class="skill-icon">↩️</div>
-                    <div class="skill-name">解除</div>
-                    <div class="skill-cost">返金</div>
-                </button>
+                <!-- JavaScriptで動的生成 -->
             </div>
         </div>
 
@@ -110,6 +116,12 @@
                 </button>
                 <button class="btn btn-overlay" id="restart-btn">
                     <span class="btn-text">最初からやり直し</span>
+                </button>
+                <button class="btn btn-overlay" id="restart-skill-btn">
+                    <span class="btn-text">スキル選択からやり直し</span>
+                </button>
+                <button class="btn btn-overlay" id="pause-help-btn">
+                    <span class="btn-text">操作方法について</span>
                 </button>
                 <button class="btn btn-overlay" id="to-start-btn">
                     <span class="btn-text">スタート画面に戻る</span>
@@ -125,11 +137,66 @@
             <div class="overlay-content">
                 <h2 class="overlay-title gameover-title">GAME OVER</h2>
                 <p class="final-score">スコア: <span id="final-score">0</span></p>
+                <div id="final-highscore-container" style="display: none; margin-bottom: 20px;">
+                    <p class="final-score" style="font-size: 1.2rem; color: #ffd700;">ハイスコア: <span
+                            id="final-highscore">0</span></p>
+                    <p id="new-record-msg"
+                        style="color: #ff00ff; font-weight: bold; animation: pulse 0.5s infinite alternate; display: none;">
+                        CONNECT NEW RECORD!</p>
+                </div>
                 <button class="btn btn-overlay" id="gameover-restart-btn">
                     <span class="btn-text">もう一度プレイ</span>
                 </button>
                 <button class="btn btn-overlay" id="gameover-start-btn">
                     <span class="btn-text">スタート画面に戻る</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 操作説明画面オーバーレイ -->
+        <div id="help-overlay" class="overlay">
+            <div class="overlay-content help-content">
+                <h2 class="overlay-title">操作方法・ルール</h2>
+                <div class="help-scroll-area">
+                    <div class="help-section">
+                        <h3>基本ルール</h3>
+                        <p>ブロックを破壊してスコアを稼ぐゲームです。HPが0になるとゲームオーバーです。</p>
+                        <ul class="help-list">
+                            <li>ブロックは時間経過とともに下降してきます。</li>
+                            <li>難易度に応じてブロックの下降速度や出現頻度が変わります。</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-section">
+                        <h3>HPについて</h3>
+                        <p>以下の条件で減少します：</p>
+                        <ul class="help-list">
+                            <li>ボールを落とす (-1)</li>
+                            <li>ブロックが画面最下部に到達 (ブロックの残りHP分のダメージ)</li>
+                            <li>ブロックがバー（パドル）に接触 (ブロックの残りHP分のダメージ)</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-section">
+                        <h3>オーブについて</h3>
+                        <p>スキル発動に必要なエネルギーです。</p>
+                        <ul class="help-list">
+                            <li>ブロック破壊時に一定確率でドロップします。</li>
+                            <li>バーでドロップしたオーブを受け止めると回収できます。</li>
+                            <li>最大200個まで所持可能です。</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-section">
+                        <h3>スキルについて</h3>
+                        <p>オーブを消費して強力なスキルを発動できます。Q, E, Rキー または画面下のボタンで使用します。</p>
+                        <div id="help-skills-list" class="help-skills-grid">
+                            <!-- JavaScriptで動的に生成 -->
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-back" id="help-back-btn" style="margin-top: 20px;">
+                    <span class="btn-text">閉じる</span>
                 </button>
             </div>
         </div>

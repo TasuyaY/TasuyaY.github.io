@@ -94,7 +94,7 @@ body {
 }
 
 /* ========================================
-   画面共通
+   画面レイアウト
 ======================================== */
 .screen {
     position: absolute;
@@ -102,14 +102,115 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    display: none;
+    display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-slow);
+    z-index: 10;
+    padding: var(--spacing-lg);
 }
 
 .screen.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.screen-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+    text-shadow: var(--shadow-glow);
+}
+
+.screen-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-lg);
+}
+
+.selected-skills-container {
     display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.selected-skill-slot {
+    width: 80px;
+    height: 80px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.selected-skill-slot.filled {
+    border-style: solid;
+    border-color: var(--accent-primary);
+    background: rgba(0, 255, 255, 0.1);
+    color: var(--text-primary);
+    flex-direction: column;
+}
+
+.skills-list-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-sm);
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: var(--spacing-lg);
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.skill-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.skill-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.skill-card.selected {
+    border-color: var(--accent-secondary);
+    background: rgba(255, 0, 255, 0.1);
+    box-shadow: 0 0 10px rgba(255, 0, 255, 0.2);
+}
+
+.skill-card-icon {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+}
+
+.skill-card-name {
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.skill-card-cost {
+    font-size: 0.7rem;
+    color: var(--orb-color);
 }
 
 /* ========================================
@@ -246,6 +347,7 @@ body {
 #game-screen {
     flex-direction: column;
     padding: 0;
+    overflow: hidden;
 }
 
 #game-hud {
@@ -264,19 +366,21 @@ body {
 .hud-right {
     display: flex;
     align-items: center;
-    gap: var(--spacing-lg);
+    gap: var(--spacing-sm);
 }
 
 .hud-item {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    flex-shrink: 0;
 }
 
 .hud-label {
     font-size: 0.85rem;
     color: var(--text-secondary);
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .hud-value {
@@ -293,10 +397,10 @@ body {
 }
 
 .hp-bar {
-    width: 150px;
-    height: 20px;
+    width: 80px;
+    height: 16px;
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -318,6 +422,8 @@ body {
     border-radius: 20px;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .btn-pause {
@@ -542,9 +648,198 @@ body {
 }
 
 /* ========================================
+   コンボ表示
+======================================== */
+#combo-container {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    z-index: 5;
+    animation: pulse 0.5s infinite alternate;
+}
+
+#combo-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    background: linear-gradient(180deg, #ffff00 0%, #ff8800 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#combo-bonus {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #00ffff;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+    margin-top: -5px;
+}
+
+@keyframes pulse {
+    from {
+        transform: translateX(-50%) scale(1);
+    }
+
+    to {
+        transform: translateX(-50%) scale(1.1);
+    }
+}
+
+
+/* ========================================
+   操作説明画面
+======================================== */
+.help-content {
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.help-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 10px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.help-scroll-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+.help-scroll-area::-webkit-scrollbar-thumb {
+    background: var(--color-primary);
+    border-radius: 4px;
+}
+
+.help-section {
+    margin-bottom: 30px;
+}
+
+.help-section h3 {
+    color: var(--color-primary);
+    font-family: var(--font-main);
+    border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+
+.help-section p {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--color-text-dim);
+    margin-bottom: 10px;
+}
+
+.help-list {
+    list-style-type: disc;
+    padding-left: 20px;
+    color: var(--color-text);
+}
+
+.help-list li {
+    margin-bottom: 5px;
+}
+
+/* スキル一覧グリッド */
+.help-skills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 15px;
+}
+
+.help-skill-item {
+    background: rgba(0, 20, 40, 0.6);
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.help-skill-icon {
+    font-size: 1.5rem;
+    background: rgba(0, 0, 0, 0.5);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 4px;
+    border: 1px solid var(--color-primary-dim);
+    flex-shrink: 0;
+}
+
+.help-skill-info {
+    flex: 1;
+}
+
+.help-skill-name {
+    color: var(--color-primary);
+    font-weight: bold;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+}
+
+.help-skill-cost {
+    color: var(--color-warning);
+    font-size: 0.8rem;
+    margin-bottom: 5px;
+}
+
+.help-skill-desc {
+    font-size: 0.8rem;
+    color: var(--color-text-dim);
+    line-height: 1.3;
+}
+
+/* ヘルプボタン */
+.btn-help {
+    background: linear-gradient(to right, rgba(0, 200, 255, 0.2), rgba(0, 100, 255, 0.2));
+    border: 1px solid rgba(0, 200, 255, 0.5);
+    color: #fff;
+    margin-bottom: 15px;
+    padding: 12px 30px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-shadow: 0 0 5px rgba(0, 200, 255, 0.5);
+    border-radius: 4px;
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-help:hover {
+    background: linear-gradient(to right, rgba(0, 200, 255, 0.4), rgba(0, 100, 255, 0.4));
+    box-shadow: 0 0 15px rgba(0, 200, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+/* ========================================
    レスポンシブ
 ======================================== */
 @media (max-width: 768px) {
+    .help-skills-grid {
+        grid-template-columns: 1fr;
+    }
+
     .btn {
         min-width: 240px;
         padding: var(--spacing-sm) var(--spacing-lg);

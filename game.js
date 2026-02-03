@@ -12,31 +12,43 @@ const Game = {
     paused: false,
     gameOver: false,
 
+    // ハイスコア設定
+    highScores: {
+        easy: 0,
+        normal: 0,
+        hard: 0,
+        extreme: 0
+    },
+
     // 難易度設定
     difficulty: 'normal',
     difficultySettings: {
         easy: {
             blockSpeed: 0.05,
             highHpRatio: 0.1,
-            maxOrbs: 200,  // オーブ保有上限
+            maxOrbs: 200,
+            initialOrbs: 100, // 初期オーブ
             label: '簡単'
         },
         normal: {
             blockSpeed: 0.06,
             highHpRatio: 0.2,
             maxOrbs: 200,
+            initialOrbs: 70,
             label: '普通'
         },
         hard: {
             blockSpeed: 0.07,
             highHpRatio: 0.3,
             maxOrbs: 200,
+            initialOrbs: 50,
             label: '難しい'
         },
         extreme: {
             blockSpeed: 0.08,
             highHpRatio: 0.4,
             maxOrbs: 200,
+            initialOrbs: 30,
             label: '極み'
         }
     },
@@ -50,11 +62,92 @@ const Game = {
     },
 
     // スキルコスト・パラメータ
-    skillCosts: {
-        penetrate: 30,
-        explode: 50,
-        barExplode: 100,         // バー爆破スキルコスト
-        barExplodeRange: 6       // バー爆破の範囲（ブロック数）
+    // スキル選択状態
+    selectedSkills: [], // 選択された3つのスキルID
+
+    // 全スキル定義
+    allSkills: [
+        {
+            id: 'penetrate',
+            name: '貫通',
+            cost: 20,
+            key: 'Q',
+            icon: '🔥',
+            description: '【パドル強化】一定時間、ボールが赤くなり、ブロックを貫通して破壊します。'
+        },
+        {
+            id: 'explode',
+            name: '爆破',
+            cost: 40,
+            key: 'E',
+            icon: '💥',
+            description: '【ボール強化】次にボールがブロックに当たった瞬間、爆発を起こして周囲のブロックを巻き込んで破壊します。'
+        },
+        {
+            id: 'barExplode',
+            name: 'バー爆破',
+            cost: 100,
+            key: 'R',
+            icon: '💣',
+            description: '【広範囲攻撃】バーの真上にあるブロックを一気に爆破・消去します。緊急回避に有効です。'
+        },
+        {
+            id: 'clone',
+            name: '分身',
+            cost: 50,
+            key: '?',
+            icon: '👥',
+            description: '【ボール追加】ボールが分裂して5つに増えます。分身したボールは落としてもHPが減りません。'
+        },
+        {
+            id: 'beam',
+            name: 'ビーム',
+            cost: 100,
+            key: '?',
+            icon: '⚡',
+            description: '【一撃必殺】バーから強力なビームを放ち、縦一列のブロックを薙ぎ払います。'
+        },
+        {
+            id: 'vPenetrate',
+            name: '縦貫通',
+            cost: 30,
+            key: '?',
+            icon: '⬆️',
+            description: '【軌道変化】全てのボールが真上に打ち出され、障害物を貫通して直進します。'
+        },
+        {
+            id: 'hPenetrate',
+            name: '横貫通',
+            cost: 50,
+            key: '?',
+            icon: '↔️',
+            description: '【軌道変化】全てのボールが真横に打ち出され、壁に反射しながらブロックを貫通破壊します。'
+        },
+        {
+            id: 'barInvincible',
+            name: 'バー無敵',
+            cost: 30,
+            key: '?',
+            icon: '🛡️',
+            description: '【防御強化】10秒間、バーが虹色に輝き無敵になります。ブロックが接触してもダメージを受けず、逆に破壊します。'
+        },
+        {
+            id: 'gravity',
+            name: '重力球',
+            cost: 70,
+            key: '?',
+            icon: '🧲',
+            description: '【補助効果】ボールを吸い寄せる重力場を生成します。散らばったボールをまとめるのに便利です。'
+        }
+    ],
+
+    // skillCostsは削除し、allSkillsから参照するように変更予定だが、
+    // 一時的に既存コードとの互換性のために残すか、別途ゲッターで対応する。
+    // 今回は既存参照箇所を修正するため削除。
+
+    // スキルパラメータ（コスト以外）
+    skillParams: {
+        barExplodeRange: 6
     },
 
     // ゲームオブジェクト
@@ -78,6 +171,7 @@ const Game = {
     },
     mouseX: 0,
     useMouseControl: true,
+    paddleTouchId: null, // パドル操作用のタッチID
 
     // ブロック生成タイマー
     blockSpawnTimer: 0,
@@ -92,6 +186,10 @@ const Game = {
 
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
+
+        // ハイスコア読み込み
+        this.loadHighScores();
+        UI.updateMainMenuHighScores(this.highScores);
 
         this.setupInputHandlers();
         this.setupUICallbacks();
@@ -113,6 +211,31 @@ const Game = {
     },
 
     /**
+     * ハイスコアをロード
+     */
+    loadHighScores() {
+        try {
+            const saved = localStorage.getItem('swift-orbit-highscores');
+            if (saved) {
+                this.highScores = JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error('ハイスコアの読み込みに失敗しました', e);
+        }
+    },
+
+    /**
+     * ハイスコアを保存
+     */
+    saveHighScores() {
+        try {
+            localStorage.setItem('swift-orbit-highscores', JSON.stringify(this.highScores));
+        } catch (e) {
+            console.error('ハイスコアの保存に失敗しました', e);
+        }
+    },
+
+    /**
      * 入力ハンドラを設定
      */
     setupInputHandlers() {
@@ -129,17 +252,23 @@ const Game = {
             if (e.key === 'Escape') {
                 this.togglePause();
             }
-            if ((e.key === ' ' || e.key === 'e' || e.key === 'E') && !this.paused && !this.gameOver) {
-                // スペース/Eキーで爆破発動
-                this.activateExplodeSkill();
-            }
             if ((e.key === 'q' || e.key === 'Q') && !this.paused && !this.gameOver) {
-                // Qキーで貫通発動
-                this.activatePenetrateSkill();
+                // Qキー: 1つ目のスキル
+                if (this.selectedSkills[0]) {
+                    this.activateSkill(this.selectedSkills[0]);
+                }
+            }
+            if ((e.key === 'e' || e.key === 'E' || e.key === ' ') && !this.paused && !this.gameOver) {
+                // Eキー/スペースキー: 2つ目のスキル
+                if (this.selectedSkills[1]) {
+                    this.activateSkill(this.selectedSkills[1]);
+                }
             }
             if ((e.key === 'r' || e.key === 'R') && !this.paused && !this.gameOver) {
-                // Rキーでバー爆破発動
-                this.activateBarExplodeSkill();
+                // Rキー: 3つ目のスキル
+                if (this.selectedSkills[2]) {
+                    this.activateSkill(this.selectedSkills[2]);
+                }
             }
             if ((e.key === 'c' || e.key === 'C') && !this.paused && !this.gameOver) {
                 // Cキーでスキル待機解除
@@ -163,12 +292,44 @@ const Game = {
             this.useMouseControl = true;
         });
 
-        // タッチ入力
-        this.canvas.addEventListener('touchmove', (e) => {
+        // タッチ入力（マルチタッチ対応）
+        this.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const rect = this.canvas.getBoundingClientRect();
-            this.mouseX = e.touches[0].clientX - rect.left;
-            this.useMouseControl = true;
+
+            // 既にパドル操作中の指があれば無視、なければ最初のタッチをパドル操作用に割り当て
+            if (this.paddleTouchId === null) {
+                const touch = e.changedTouches[0];
+                this.paddleTouchId = touch.identifier;
+                this.mouseX = touch.clientX - rect.left;
+                this.useMouseControl = true;
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // スクロール防止
+            const rect = this.canvas.getBoundingClientRect();
+
+            // パドル操作用のタッチを探して更新
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (touch.identifier === this.paddleTouchId) {
+                    this.mouseX = touch.clientX - rect.left;
+                    this.useMouseControl = true;
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            // パドル操作用のタッチが終了したか確認
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === this.paddleTouchId) {
+                    this.paddleTouchId = null;
+                    break;
+                }
+            }
         }, { passive: false });
     },
 
@@ -177,7 +338,14 @@ const Game = {
      */
     setupUICallbacks() {
         UI.setupEventListeners({
-            onDifficultySelect: (difficulty) => this.startGame(difficulty),
+            onDifficultySelect: (difficulty) => {
+                this.difficulty = difficulty;
+                this.showSkillSelection();
+            },
+            onBackToDifficulty: () => this.returnToDifficultySelect(),
+            onSkillSelectToggle: (skillId) => this.toggleSkillSelection(skillId),
+            onGameStart: () => this.startGame(),
+            onSkillTrigger: (skillId) => this.activateSkill(skillId),
             onPause: () => this.togglePause(),
             onResume: () => this.resumeGame(),
             onRestart: () => this.restartGame(),
@@ -185,15 +353,89 @@ const Game = {
             onExit: () => this.exitGame(),
             onSkillPenetrate: () => this.activatePenetrateSkill(),
             onSkillExplode: () => this.activateExplodeSkill(),
-            onSkillBarExplode: () => this.activateBarExplodeSkill(),
-            onSkillCancel: () => this.cancelSkill()
+            onSkillCancel: () => this.cancelSkill(),
+            onRestartSkill: () => this.returnToSkillSelect(),
+            onShowHelp: () => UI.renderHelpSkills(this.allSkills)
         });
+    },
+
+    /**
+     * 難易度選択に戻る
+     */
+    returnToDifficultySelect() {
+        UI.showScreen('start');
+        this.selectedSkills = [];
+    },
+
+    /**
+     * スキル選択画面を表示
+     */
+    showSkillSelection() {
+        this.selectedSkills = []; // リセット
+        UI.renderSkillsList(this.allSkills, this.selectedSkills);
+        UI.showScreen('skillSelect');
+    },
+
+    /**
+     * スキルの選択/解除
+     */
+    toggleSkillSelection(skillId) {
+        const index = this.selectedSkills.indexOf(skillId);
+        if (index >= 0) {
+            // 解除
+            this.selectedSkills.splice(index, 1);
+        } else {
+            // 追加（3つまで）
+            if (this.selectedSkills.length < 3) {
+                this.selectedSkills.push(skillId);
+            }
+        }
+        UI.renderSkillsList(this.allSkills, this.selectedSkills);
+    },
+
+    /**
+     * スキル発動（共通エントリポイント）
+     */
+    activateSkill(skillId) {
+        if (this.paused || this.gameOver) return;
+
+        // スキルIDに基づいて分岐
+        switch (skillId) {
+            case 'penetrate':
+                this.activatePenetrateSkill();
+                break;
+            case 'explode':
+                this.activateExplodeSkill();
+                break;
+            case 'barExplode':
+                this.activateBarExplodeSkill();
+                break;
+            case 'clone':
+                this.activateCloneSkill();
+                break;
+            case 'beam':
+                this.activateBeamSkill();
+                break;
+            case 'vPenetrate':
+                this.activateVerticalPenetrateSkill();
+                break;
+            case 'hPenetrate':
+                this.activateHorizontalPenetrateSkill();
+                break;
+            case 'barInvincible':
+                this.activateBarInvincibleSkill();
+                break;
+            case 'gravity':
+                this.activateGravitySkill();
+                break;
+        }
     },
 
     /**
      * ゲームを開始
      */
-    startGame(difficulty) {
+    startGame() {
+        const difficulty = this.difficulty; // 保存された難易度を使用
         // 既存のゲームループを停止
         this.running = false;
 
@@ -202,12 +444,13 @@ const Game = {
 
         UI.showScreen('game');
         UI.hideAllOverlays();
-        UI.updateDifficultyBadge(difficulty);
+        UI.updateDifficultyBadge(this.difficultySettings[this.difficulty].label);
+        UI.renderSkillBar(this.allSkills, this.selectedSkills); // スキルバー生成
 
         this.resizeCanvas();
         this.createInitialBlocks();
         this.createPaddle();
-        this.createBall();
+        this.resetBall();
 
         this.paused = false;
         this.gameOver = false;
@@ -223,22 +466,49 @@ const Game = {
      * ゲーム状態をリセット
      */
     resetGameState() {
+        const settings = this.difficultySettings[this.difficulty];
         this.player = {
             hp: 10,
             maxHp: 10,
             score: 0,
-            orbs: 0
+            orbs: settings.initialOrbs || 0,
+            combo: 0,
+            comboBonus: 0, // 現在のコンボボーナス%
         };
 
         this.blocks = [];
         this.balls = [];
         this.orbs = [];
         this.explosions = [];
+        this.gravityWells = []; // 重力井戸
+        this.shockwaves = []; // 衝撃波エフェクト
+        this.beamEffects = []; // ビームエフェクト
+        this.confetti = []; // 紙吹雪エフェクト
         this.blockSpawnTimer = 0;
 
         UI.updateHP(this.player.hp, this.player.maxHp);
         UI.updateScore(this.player.score);
         UI.updateOrbs(this.player.orbs);
+        UI.updateCombo(0, 0);
+    },
+
+    /**
+     * ボールをパドル上にリセット
+     */
+    resetBall() {
+        const ballX = this.paddle.x + this.paddle.width / 2;
+        const ballY = this.paddle.y - 15; // ボール半径(10) + 余白
+        const ball = new Ball(ballX, ballY, 10);
+
+        // 初期速度設定（上向き、少しランダムな角度）
+        const speed = 7;
+        const angle = -Math.PI / 2 + (Math.random() * 0.4 - 0.2); // 真上 ±0.2ラジアン
+
+        ball.dx = Math.cos(angle) * speed;
+        ball.dy = Math.sin(angle) * speed;
+        ball.speed = speed;
+
+        this.balls = [ball];
     },
 
     /**
@@ -329,8 +599,13 @@ const Game = {
     gameLoop() {
         if (!this.running) return;
 
-        if (!this.paused && !this.gameOver) {
-            this.update();
+        if (!this.paused) {
+            if (!this.gameOver) {
+                this.update();
+            } else {
+                // ゲームオーバー時もエフェクトだけは更新
+                this.updateConfetti();
+            }
         }
 
         this.draw();
@@ -347,10 +622,15 @@ const Game = {
         this.updateBlocks();
         this.updateOrbs();
         this.updateExplosions();
+        this.updateShockwaves(); // 衝撃波更新
+        this.updateBeamEffects(); // ビームエフェクト更新
+        this.updateGravityWells(); // 重力井戸更新
+        this.updateConfetti(); // 紙吹雪更新
         this.spawnBlocks();
         this.checkGameOver();
         this.updateUI();
     },
+
 
     /**
      * パドル更新
@@ -380,37 +660,87 @@ const Game = {
             if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= this.canvas.width) {
                 ball.dx = -ball.dx;
                 ball.x = Math.max(ball.radius, Math.min(this.canvas.width - ball.radius, ball.x));
+                ball.ignoredGravityWell = null; // 壁衝突でリセット
             }
 
             // 天井との衝突
             if (ball.y - ball.radius <= 0) {
                 ball.dy = -ball.dy;
                 ball.y = ball.radius;
+                ball.ignoredGravityWell = null; // 天井衝突でリセット
             }
 
-            // 床との衝突（ダメージ）
-            if (ball.y + ball.radius >= this.canvas.height) {
-                this.player.hp--;
-                UI.updateHP(this.player.hp, this.player.maxHp);
-
-                if (this.balls.length > 1) {
+            // 画面外に出たら削除
+            if (ball.y > this.canvas.height + ball.radius) {
+                // 分身ボールの場合はダメージなしで消滅のみ
+                if (ball.isClone) {
                     this.balls.splice(i, 1);
-                } else {
-                    // ボールをリセット
-                    ball.x = this.paddle.x + this.paddle.width / 2;
-                    ball.y = this.paddle.y - 20;
-                    ball.dy = -Math.abs(ball.dy);
-                    ball.penetrating = false;
-                    ball.explodable = false;
+                    continue;
+                }
+
+                // 通常ボールが落ちた場合
+                this.player.hp--;
+                this.player.combo = 0;
+                this.player.comboBonus = 0;
+                UI.updateCombo(0, 0);
+                UI.updateHP(this.player.hp, this.player.maxHp);
+                this.balls.splice(i, 1);
+
+                // 通常ボールが全て消えたかチェック
+                const normalBallsRemaining = this.balls.filter(b => !b.isClone).length;
+
+                if (normalBallsRemaining === 0) {
+                    if (this.player.hp > 0) {
+                        // 少し遅延させてボールを復活
+                        setTimeout(() => {
+                            // 通常ボールが0で、まだHPがあれば復活
+                            const stillNoNormalBalls = this.balls.filter(b => !b.isClone).length === 0;
+                            if (stillNoNormalBalls && this.player.hp > 0) {
+                                this.resetBall();
+                            }
+                        }, 500);
+                    } else {
+                        // ゲームオーバー
+                        setTimeout(() => {
+                            if (this.balls.length === 0 || this.balls.filter(b => !b.isClone).length === 0) {
+                                this.checkGameOver();
+                            }
+                        }, 100);
+                    }
                 }
                 continue;
             }
 
             // パドルとの衝突
-            this.checkBallPaddleCollision(ball);
+            if (this.checkBallPaddleCollision(ball)) {
+                ball.ignoredGravityWell = null; // パドル衝突でリセット
+            }
 
             // ブロックとの衝突
-            this.checkBallBlockCollisions(ball);
+            if (this.checkBallBlockCollisions(ball)) {
+                ball.ignoredGravityWell = null; // ブロック衝突でリセット
+            }
+
+            // 重力井戸との相互作用
+            if (this.gravityWells) {
+                for (const well of this.gravityWells) {
+                    if (well.finished) continue;
+
+                    // 除外中の重力井戸はスキップ
+                    if (ball.ignoredGravityWell === well) continue;
+
+                    // 中心に触れたらその重力井戸を吸引対象外にする（跳ね返りなし）
+                    if (well.checkCollision(ball)) {
+                        ball.ignoredGravityWell = well;
+                        continue;
+                    }
+
+                    // 吸引力を適用
+                    const pull = well.calculatePull(ball);
+                    ball.dx += pull.x;
+                    ball.dy += pull.y;
+                }
+            }
         }
     },
 
@@ -448,7 +778,9 @@ const Game = {
                 UI.setSkillActive('penetrate', false);
                 UI.setSkillActive('explode', false);
             }
+            return true; // 衡突あり
         }
+        return false; // 街突なし
     },
 
     /**
@@ -480,6 +812,19 @@ const Game = {
 
                     if (fromLeft || fromRight) {
                         ball.dx = -ball.dx;
+
+                        // 水平移動ボール対策: ブロック上下端15%に当たった場合は角度をつける
+                        const blockHeight = bounds.bottom - bounds.top;
+                        const edgeThreshold = blockHeight * 0.15;
+                        const relativeY = ball.y - bounds.top;
+
+                        if (relativeY < edgeThreshold) {
+                            // 上端15%に当たった場合、上向きに角度をつける
+                            ball.dy = -Math.abs(ball.speed * 0.3);
+                        } else if (relativeY > blockHeight - edgeThreshold) {
+                            // 下端15%に当たった場合、下向きに角度をつける
+                            ball.dy = Math.abs(ball.speed * 0.3);
+                        }
                     }
                     if (fromTop || fromBottom) {
                         ball.dy = -ball.dy;
@@ -497,14 +842,24 @@ const Game = {
 
                 if (destroyed) {
                     this.onBlockDestroyed(block, i);
+
+                    // 貫通時は衝撃波エフェクトを発生
+                    if (ball.penetrating && this.shockwaves) {
+                        const sw = new ShockwaveEffect(
+                            block.x + block.width / 2,
+                            block.y + block.height / 2
+                        );
+                        this.shockwaves.push(sw);
+                    }
                 }
 
                 // 貫通でない場合は1つのブロックで停止
                 if (!ball.penetrating) {
-                    break;
+                    return true; // 街突あり
                 }
             }
         }
+        return false; // 街突なし
     },
 
     /**
@@ -513,8 +868,22 @@ const Game = {
     onBlockDestroyed(block, index) {
         this.blocks.splice(index, 1);
 
-        // スコア加算
-        const scoreGain = block.maxHp * 100;
+        // コンボ加算
+        this.player.combo++;
+
+        // コンボボーナス計算
+        // 10コンボごとに2%、100コンボごとに追加5%
+        const tens = Math.floor(this.player.combo / 10);
+        const hundreds = Math.floor(this.player.combo / 100);
+        this.player.comboBonus = tens * 2 + hundreds * 5;
+
+        // UI更新
+        UI.updateCombo(this.player.combo, this.player.comboBonus);
+
+        // スコア加算（コンボボーナス適用）
+        const baseScore = block.maxHp * 100;
+        const bonusMultiplier = 1 + (this.player.comboBonus / 100);
+        const scoreGain = Math.floor(baseScore * bonusMultiplier);
         this.player.score += scoreGain;
 
         // オーブドロップ判定
@@ -530,9 +899,38 @@ const Game = {
     updateBlocks() {
         const settings = this.difficultySettings[this.difficulty];
 
-        for (const block of this.blocks) {
-            if (!block.destroyed) {
-                block.y += settings.blockSpeed;
+        for (let i = this.blocks.length - 1; i >= 0; i--) {
+            const block = this.blocks[i];
+            if (block.destroyed) continue;
+
+            block.y += settings.blockSpeed;
+
+            // パドルとの衝突判定
+            const paddleBounds = this.paddle.getBounds();
+            if (block.y + block.height >= paddleBounds.top &&
+                block.y <= paddleBounds.bottom &&
+                block.x + block.width >= paddleBounds.left &&
+                block.x <= paddleBounds.right) {
+
+                // バー無敵時はダメージなしで破壊
+                if (this.player.invincible) {
+                    block.takeDamage(999);
+                    this.onBlockDestroyed(block, i);
+                } else {
+                    // 通常時は残耐久分のダメージを受けてブロック破壊
+                    this.player.hp -= block.hp;
+                    this.player.combo = 0;
+                    this.player.comboBonus = 0;
+                    UI.updateCombo(0, 0);
+                    UI.updateHP(this.player.hp, this.player.maxHp);
+                    this.onBlockDestroyed(block, i);
+
+                    // HP確認
+                    if (this.player.hp <= 0) {
+                        this.triggerGameOver();
+                        return;
+                    }
+                }
             }
         }
     },
@@ -600,22 +998,88 @@ const Game = {
     },
 
     /**
+     * 重力井戸更新
+     */
+    updateGravityWells() {
+        if (!this.gravityWells) return;
+
+        for (let i = this.gravityWells.length - 1; i >= 0; i--) {
+            const well = this.gravityWells[i];
+            well.update();
+
+            if (well.finished) {
+                this.gravityWells.splice(i, 1);
+            }
+        }
+    },
+
+    /**
+     * 衝撃波エフェクト更新
+     */
+    updateShockwaves() {
+        if (!this.shockwaves) return;
+
+        for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+            const sw = this.shockwaves[i];
+            sw.update();
+
+            if (sw.finished) {
+                this.shockwaves.splice(i, 1);
+            }
+        }
+    },
+
+    /**
+     * ビームエフェクト更新
+     */
+    updateBeamEffects() {
+        if (!this.beamEffects) return;
+
+        for (let i = this.beamEffects.length - 1; i >= 0; i--) {
+            const beam = this.beamEffects[i];
+            beam.update();
+
+            if (beam.finished) {
+                this.beamEffects.splice(i, 1);
+            }
+        }
+    },
+
+    /**
      * ゲームオーバー判定
      */
     checkGameOver() {
-        // HP が 0
+        // プレイヤーおよびパドルの存在確認
+        if (!this.player || !this.paddle) return;
+
+        // HP が 0 以下
         if (this.player.hp <= 0) {
             this.triggerGameOver();
             return;
         }
 
-        // ブロックが画面下またはパドルに到達
-        for (const block of this.blocks) {
+        // ブロックが画面下に到達したらダメージ（即ゲームオーバーではない）
+        for (let i = this.blocks.length - 1; i >= 0; i--) {
+            const block = this.blocks[i];
             if (block.destroyed) continue;
 
-            if (block.y + block.height >= this.paddle.y) {
-                this.triggerGameOver();
-                return;
+            // 画面下に到達
+            if (block.y + block.height >= this.canvas.height) {
+                // 残耐久分のダメージ
+                this.player.hp -= block.hp;
+                this.player.combo = 0;
+                this.player.comboBonus = 0;
+                UI.updateCombo(0, 0);
+                UI.updateHP(this.player.hp, this.player.maxHp);
+
+                // ブロックを破壊
+                this.blocks.splice(i, 1);
+
+                // HP確認
+                if (this.player.hp <= 0) {
+                    this.triggerGameOver();
+                    return;
+                }
             }
         }
     },
@@ -625,26 +1089,84 @@ const Game = {
      */
     triggerGameOver() {
         this.gameOver = true;
-        UI.showFinalScore(this.player.score);
+
+        // ハイスコア判定
+        const currentScore = this.player.score;
+        const currentHighScore = this.highScores[this.difficulty] || 0;
+        let isNewRecord = false;
+
+        if (currentScore > currentHighScore) {
+            this.highScores[this.difficulty] = currentScore;
+            this.saveHighScores();
+            isNewRecord = true;
+
+            // 紙吹雪発射
+            for (let i = 0; i < 100; i++) {
+                const color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                this.confetti.push(new Confetti(
+                    this.canvas.width / 2 + (Math.random() * 200 - 100),
+                    this.canvas.height,
+                    color
+                ));
+            }
+        }
+
+        UI.showFinalScore(currentScore, Math.max(currentScore, currentHighScore), isNewRecord);
         UI.showOverlay('gameover');
+    },
+
+    /**
+     * 紙吹雪更新
+     */
+    updateConfetti() {
+        if (!this.confetti) return;
+        for (let i = this.confetti.length - 1; i >= 0; i--) {
+            const c = this.confetti[i];
+            c.update();
+            if (c.timer >= c.duration) {
+                this.confetti.splice(i, 1);
+            }
+        }
+    },
+
+    /**
+     * 紙吹雪描画
+     */
+    drawConfetti() {
+        if (!this.confetti) return;
+        for (const c of this.confetti) {
+            c.draw(this.ctx);
+        }
     },
 
     /**
      * UI更新
      */
     updateUI() {
+        // プレイヤーとパドルの存在確認
+        if (!this.player || !this.paddle) return;
+
         const settings = this.difficultySettings[this.difficulty];
+
+        // スコアとオーブの表示更新
         UI.updateScore(this.player.score);
         UI.updateOrbs(this.player.orbs, settings.maxOrbs);
 
-        const ballExplodable = this.balls.some(b => b.explodable);
+        // スキルボタンの状態更新
+        let canExplode = false;
+        for (const ball of this.balls) {
+            if (ball.explodable) {
+                canExplode = true;
+                break;
+            }
+        }
+
         UI.updateSkillButtons(
             this.player.orbs,
-            this.skillCosts.penetrate,
-            this.skillCosts.explode,
-            this.skillCosts.barExplode,
+            this.allSkills,
+            this.selectedSkills,
             this.paddle.enhanced,
-            ballExplodable
+            canExplode
         );
     },
 
@@ -658,6 +1180,13 @@ const Game = {
 
         // グリッド背景
         this.drawGrid();
+
+        // 重力井戸（背景側）
+        if (this.gravityWells) {
+            for (const well of this.gravityWells) {
+                well.draw(this.ctx);
+            }
+        }
 
         // 爆発エフェクト
         for (const explosion of this.explosions) {
@@ -683,6 +1212,23 @@ const Game = {
         for (const ball of this.balls) {
             ball.draw(this.ctx);
         }
+
+        // 衝撃波エフェクト
+        if (this.shockwaves) {
+            for (const sw of this.shockwaves) {
+                sw.draw(this.ctx);
+            }
+        }
+
+        // ビームエフェクト
+        if (this.beamEffects) {
+            for (const beam of this.beamEffects) {
+                beam.draw(this.ctx);
+            }
+        }
+
+        // 紙吹雪エフェクト
+        this.drawConfetti();
     },
 
     /**
@@ -710,6 +1256,14 @@ const Game = {
     },
 
     /**
+     * スキルコストを取得
+     */
+    getSkillCost(id) {
+        const skill = this.allSkills.find(s => s.id === id);
+        return skill ? skill.cost : 999;
+    },
+
+    /**
      * スキル待機状態を解除
      * パドルの状態をリセットし、消費オーブの半額を返却
      */
@@ -719,10 +1273,12 @@ const Game = {
         // 消費オーブの半額を返却
         const enhanceType = this.paddle.enhanceType;
         if (enhanceType === 'penetrate') {
-            this.player.orbs += Math.floor(this.skillCosts.penetrate / 2);
+            const cost = this.getSkillCost('penetrate');
+            this.player.orbs += Math.floor(cost / 2);
             UI.setSkillActive('penetrate', false);
         } else if (enhanceType === 'explode') {
-            this.player.orbs += Math.floor(this.skillCosts.explode / 2);
+            const cost = this.getSkillCost('explode');
+            this.player.orbs += Math.floor(cost / 2);
             UI.setSkillActive('explode', false);
         }
 
@@ -746,32 +1302,185 @@ const Game = {
      * 貫通スキル発動
      */
     activatePenetrateSkill() {
-        if (this.player.orbs >= this.skillCosts.penetrate && !this.paddle.enhanced) {
-            this.player.orbs -= this.skillCosts.penetrate;
+        const cost = this.getSkillCost('penetrate');
+        if (this.player.orbs >= cost && !this.paddle.enhanced) {
+            this.player.orbs -= cost;
             this.paddle.enhance('penetrate');
             UI.setSkillActive('penetrate', true);
         }
     },
 
     /**
-     * 爆破スキル発動
+     * 爆破スキル発動（即時発動）
      */
     activateExplodeSkill() {
-        // ボールが爆破可能状態なら爆発を実行
-        for (const ball of this.balls) {
-            if (ball.explodable) {
-                if (ball.explode()) {
-                    this.createExplosion(ball.x, ball.y);
+        const cost = this.getSkillCost('explode');
+        if (this.player.orbs >= cost) {
+            this.player.orbs -= cost;
+
+            // 全てのボールの位置で爆発
+            this.balls.forEach(ball => {
+                this.createExplosion(ball.x, ball.y);
+            });
+
+            // 画面を揺らすなどの演出があればここに追加
+        }
+    },
+
+    /**
+     * 分身スキル発動
+     */
+    activateCloneSkill() {
+        const cost = this.getSkillCost('clone');
+        if (this.player.orbs >= cost) {
+            this.player.orbs -= cost;
+
+            const newBalls = [];
+            const cloneCount = 5; // 5個増加
+
+            this.balls.forEach(ball => {
+                for (let i = 0; i < cloneCount; i++) {
+                    const clone = new Ball(ball.x, ball.y, ball.radius);
+                    clone.isClone = true;
+                    clone.speed = ball.speed;
+                    clone.maxSpeed = ball.maxSpeed;
+
+                    // 角度を散らす
+                    // 元の速度ベクトルから角度を計算し、少しずらす
+                    const angle = Math.atan2(ball.dy, ball.dx);
+                    const spread = (Math.PI / 4) * (Math.random() - 0.5); // ±45度くらい
+                    const newAngle = angle + spread;
+
+                    clone.dx = Math.cos(newAngle) * clone.speed;
+                    clone.dy = Math.sin(newAngle) * clone.speed;
+
+                    // 下向きになりすぎないように調整
+                    if (clone.dy > 0 && clone.y > this.canvas.height / 2) {
+                        clone.dy = -Math.abs(clone.dy);
+                    }
+
+                    newBalls.push(clone);
                 }
-                return;
+            });
+
+            // 新しいボールを追加
+            this.balls.push(...newBalls);
+        }
+    },
+
+    /**
+     * ビームスキル発動
+     * パドルから真上に極太レーザーを発射
+     */
+    activateBeamSkill() {
+        const cost = this.getSkillCost('beam');
+        if (this.player.orbs >= cost) {
+            this.player.orbs -= cost;
+
+            const beamWidth = 100;
+            const beamX = this.paddle.x + this.paddle.width / 2;
+
+            // 範囲内のブロックを破壊
+            this.damageBlocksInRect(beamX - beamWidth / 2, 0, beamWidth, this.canvas.height, 999);
+
+            // ビームエフェクト（水色のビーム）
+            if (this.beamEffects) {
+                const beam = new BeamEffect(beamX, 0, this.paddle.y);
+                this.beamEffects.push(beam);
             }
         }
+    },
 
-        // そうでなければスキルを準備
-        if (this.player.orbs >= this.skillCosts.explode && !this.paddle.enhanced) {
-            this.player.orbs -= this.skillCosts.explode;
-            this.paddle.enhance('explode');
-            UI.setSkillActive('explode', true);
+    /**
+     * 縦貫通スキル発動
+     */
+    activateVerticalPenetrateSkill() {
+        const cost = this.getSkillCost('vPenetrate');
+        if (this.player.orbs >= cost) {
+            this.player.orbs -= cost;
+
+            this.balls.forEach(ball => {
+                ball.dx = 0;
+                ball.dy = -Math.abs(ball.speed); // 真上に
+                ball.penetrating = true;
+                ball.penetrateCount = 0;
+            });
+        }
+    },
+
+    /**
+     * 横貫通スキル発動
+     */
+    activateHorizontalPenetrateSkill() {
+        const cost = this.getSkillCost('hPenetrate');
+        if (this.player.orbs >= cost) {
+            this.player.orbs -= cost;
+
+            this.balls.forEach(ball => {
+                ball.dy = 0;
+                ball.dx = ball.speed; // 真横に
+                ball.penetrating = true;
+                ball.penetrateCount = 0;
+            });
+        }
+    },
+
+    /**
+     * バー無敵スキル発動
+     */
+    activateBarInvincibleSkill() {
+        const cost = this.getSkillCost('barInvincible');
+        if (this.player.orbs >= cost && !this.player.invincible) {
+            this.player.orbs -= cost;
+            this.player.invincible = true;
+            this.paddle.invincible = true; // パドルの虹色表示を有効化
+
+            // 10秒後に解除
+            setTimeout(() => {
+                this.player.invincible = false;
+                this.paddle.invincible = false; // パドルの虹色表示を解除
+            }, 10000);
+        }
+    },
+
+    /**
+     * 重力球スキル発動
+     * ボール位置に重力場を生成し、ボールを吸い寄せる
+     */
+    activateGravitySkill() {
+        const cost = this.getSkillCost('gravity');
+        if (this.player.orbs >= cost && this.balls.length > 0) {
+            this.player.orbs -= cost;
+
+            // 各ボール位置に重力場を生成
+            const wellRadius = this.blockWidth * 5; // 5ブロック分の半径
+
+            this.balls.forEach(ball => {
+                const well = new GravityWell(ball.x, ball.y, wellRadius);
+                this.gravityWells.push(well);
+            });
+        }
+    },
+
+    /**
+     *矩形範囲内のブロックにダメージを与える
+     */
+    damageBlocksInRect(x, y, width, height, damage) {
+        for (let i = this.blocks.length - 1; i >= 0; i--) {
+            const block = this.blocks[i];
+            if (block.destroyed) continue;
+
+            // 矩形同士の衝突判定
+            if (x < block.x + block.width &&
+                x + width > block.x &&
+                y < block.y + block.height &&
+                y + height > block.y) {
+
+                const destroyed = block.takeDamage(damage);
+                if (destroyed) {
+                    this.onBlockDestroyed(block, i);
+                }
+            }
         }
     },
 
@@ -780,11 +1489,12 @@ const Game = {
      * バーの縦位置を基準に、指定ブロック数分の範囲を横一掃で破壊（耐久無視）
      */
     activateBarExplodeSkill() {
-        if (this.player.orbs >= this.skillCosts.barExplode) {
-            this.player.orbs -= this.skillCosts.barExplode;
+        const cost = this.getSkillCost('barExplode');
+        if (this.player.orbs >= cost) {
+            this.player.orbs -= cost;
 
             // バー爆破範囲を計算（ブロック数 × (ブロック高さ + 余白)）
-            const rangeBlocks = this.skillCosts.barExplodeRange;
+            const rangeBlocks = this.skillParams.barExplodeRange;
             const rangeHeight = rangeBlocks * (this.blockHeight + this.blockPadding);
 
             // バーの上部から指定範囲内のブロックをすべて破壊
@@ -840,7 +1550,7 @@ const Game = {
             );
 
             if (dist <= explosionRadius) {
-                const destroyed = block.takeDamage(2);
+                const destroyed = block.takeDamage(4); // ダメージを4に変更
                 if (destroyed) {
                     this.onBlockDestroyed(block, i);
                 }
@@ -886,12 +1596,23 @@ const Game = {
     },
 
     /**
+     * スキル選択画面に戻る
+     */
+    returnToSkillSelect() {
+        UI.hideAllOverlays();
+        this.paused = false;
+        this.running = false;
+        this.showSkillSelection();
+    },
+
+    /**
      * スタート画面に戻る
      */
     returnToStart() {
         this.running = false;
         UI.hideAllOverlays();
         UI.showScreen('start');
+        UI.updateMainMenuHighScores(this.highScores);
     },
 
     /**

@@ -194,6 +194,15 @@ class Ball {
         this.explodable = false;
         this.explodeTimer = 0;
         this.explodeDuration = 300; // フレーム数
+
+        this.isClone = false; // 分身フラグ
+
+        // 残像用履歴（通常ボールのみ使用）
+        this.trail = [];
+        this.maxTrailLength = 8;
+
+        // 重力井戸関連（触れた井戸をスキップするため）
+        this.ignoredGravityWell = null;
     }
 
     /**
@@ -202,6 +211,14 @@ class Ball {
     update() {
         // 速度制限を適用
         this.clampSpeed();
+
+        // 残像用に位置履歴を記録（通常ボールのみ）
+        if (!this.isClone) {
+            this.trail.push({ x: this.x, y: this.y });
+            if (this.trail.length > this.maxTrailLength) {
+                this.trail.shift();
+            }
+        }
 
         this.x += this.dx;
         this.y += this.dy;
@@ -234,37 +251,85 @@ class Ball {
     draw(ctx) {
         ctx.save();
 
-        // グロー効果
-        let glowColor = 'rgba(255, 255, 255, 0.5)';
-        let ballColor = '#ffffff';
+        // 分身ボール: 白色系
+        // 通常ボール: 金色系 + 残像
+        if (this.isClone) {
+            // 分身ボール（白色）
+            let glowColor = 'rgba(200, 200, 255, 0.5)';
+            let ballColor = '#ffffff';
 
-        if (this.penetrating) {
-            glowColor = 'rgba(255, 100, 0, 0.8)';
-            ballColor = '#ff6600';
-        } else if (this.explodable) {
-            glowColor = 'rgba(255, 200, 0, 0.8)';
-            ballColor = '#ffcc00';
+            if (this.penetrating) {
+                glowColor = 'rgba(255, 150, 150, 0.8)';
+                ballColor = '#ffaaaa';
+            } else if (this.explodable) {
+                glowColor = 'rgba(255, 200, 150, 0.8)';
+                ballColor = '#ffddaa';
+            }
+
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = glowColor;
+
+            const gradient = ctx.createRadialGradient(
+                this.x - this.radius / 3, this.y - this.radius / 3, 0,
+                this.x, this.y, this.radius
+            );
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(1, ballColor);
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // 通常ボール（金色 + 残像）
+
+            // 残像を描画
+            for (let i = 0; i < this.trail.length; i++) {
+                const pos = this.trail[i];
+                const alpha = (i / this.trail.length) * 0.4;
+                const size = this.radius * (0.4 + (i / this.trail.length) * 0.4);
+
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
+            // グロー効果
+            let glowColor = 'rgba(255, 215, 0, 0.6)';
+            let ballColor = '#ffd700';
+
+            if (this.penetrating) {
+                glowColor = 'rgba(255, 100, 0, 0.8)';
+                ballColor = '#ff6600';
+            } else if (this.explodable) {
+                glowColor = 'rgba(255, 200, 0, 0.8)';
+                ballColor = '#ffcc00';
+            }
+
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = glowColor;
+
+            // ボール本体
+            const gradient = ctx.createRadialGradient(
+                this.x - this.radius / 3, this.y - this.radius / 3, 0,
+                this.x, this.y, this.radius
+            );
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.3, '#fff8dc');
+            gradient.addColorStop(1, ballColor);
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
         }
 
-        // グロー
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = glowColor;
-
-        // ボール本体
-        const gradient = ctx.createRadialGradient(
-            this.x - this.radius / 3, this.y - this.radius / 3, 0,
-            this.x, this.y, this.radius
-        );
-        gradient.addColorStop(0, '#ffffff');
-        gradient.addColorStop(1, ballColor);
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 爆破可能表示
+        // 爆破可能表示（両方共通）
         if (this.explodable) {
+            ctx.shadowBlur = 0;
             ctx.strokeStyle = 'rgba(255, 200, 0, ' + (0.5 + Math.sin(this.explodeTimer * 0.2) * 0.5) + ')';
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -342,6 +407,10 @@ class Paddle {
         // 強化状態
         this.enhanced = false;
         this.enhanceType = null; // 'penetrate' or 'explode'
+
+        // 無敵状態
+        this.invincible = false;
+        this.animationTimer = 0;
     }
 
     /**
@@ -350,12 +419,23 @@ class Paddle {
     draw(ctx) {
         ctx.save();
 
+        // アニメーションタイマー更新
+        this.animationTimer += 0.1;
+
         // グロー効果
         let glowColor = 'rgba(0, 255, 255, 0.5)';
         let paddleColor1 = '#00ffff';
         let paddleColor2 = '#0088aa';
 
-        if (this.enhanced) {
+        // 無敵状態は虹色明滅
+        if (this.invincible) {
+            // 虹色を時間で変化させる
+            const hue = (this.animationTimer * 50) % 360;
+            const brightness = 0.7 + Math.sin(this.animationTimer * 3) * 0.3;
+            glowColor = `hsla(${hue}, 100%, 70%, 0.9)`;
+            paddleColor1 = `hsl(${hue}, 100%, ${60 + brightness * 20}%)`;
+            paddleColor2 = `hsl(${(hue + 30) % 360}, 100%, ${40 + brightness * 20}%)`;
+        } else if (this.enhanced) {
             if (this.enhanceType === 'penetrate') {
                 glowColor = 'rgba(255, 100, 0, 0.8)';
                 paddleColor1 = '#ff6600';
@@ -367,7 +447,7 @@ class Paddle {
             }
         }
 
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = this.invincible ? 25 : 15;
         ctx.shadowColor = glowColor;
 
         // パドル本体
@@ -578,7 +658,366 @@ class Explosion {
     }
 }
 
+/**
+ * 衝撃波エフェクトクラス（貫通用）
+ */
+class ShockwaveEffect {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 0;
+        this.maxRadius = 60;
+        this.alpha = 1;
+        this.finished = false;
+        this.expandSpeed = 8;
+    }
+
+    update() {
+        this.radius += this.expandSpeed;
+        this.alpha = 1 - (this.radius / this.maxRadius);
+
+        if (this.radius >= this.maxRadius) {
+            this.finished = true;
+        }
+    }
+
+    draw(ctx) {
+        if (this.finished) return;
+
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+
+        // 外側リング
+        ctx.strokeStyle = '#ff8800';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ffaa00';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 内側リング
+        ctx.strokeStyle = '#ffcc00';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * ビームエフェクトクラス
+ */
+class BeamEffect {
+    constructor(x, y, height) {
+        this.x = x;
+        this.y = y; // 終点Y（上端）
+        this.height = height; // ビームの高さ
+        this.width = 60;
+        this.maxWidth = 80;
+        this.alpha = 1;
+        this.finished = false;
+        this.timer = 0;
+        this.duration = 30; // フレーム数
+
+        // パーティクル
+        this.particles = [];
+        for (let i = 0; i < 30; i++) {
+            this.particles.push({
+                x: this.x + (Math.random() - 0.5) * this.width,
+                y: this.y + Math.random() * this.height,
+                size: 2 + Math.random() * 4,
+                speed: 3 + Math.random() * 5,
+                alpha: Math.random()
+            });
+        }
+    }
+
+    update() {
+        this.timer++;
+
+        // 幅を脈動させる
+        this.width = this.maxWidth * (0.8 + Math.sin(this.timer * 0.3) * 0.2);
+
+        // フェードアウト
+        if (this.timer > this.duration * 0.6) {
+            this.alpha = 1 - ((this.timer - this.duration * 0.6) / (this.duration * 0.4));
+        }
+
+        if (this.timer >= this.duration) {
+            this.finished = true;
+        }
+
+        // パーティクル更新
+        for (const p of this.particles) {
+            p.y -= p.speed;
+            p.alpha = Math.random();
+            if (p.y < this.y) {
+                p.y = this.y + this.height;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.finished) return;
+
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+
+        // メインビーム
+        const gradient = ctx.createLinearGradient(
+            this.x - this.width / 2, 0,
+            this.x + this.width / 2, 0
+        );
+        gradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
+        gradient.addColorStop(0.3, 'rgba(100, 255, 255, 0.6)');
+        gradient.addColorStop(0.5, 'rgba(200, 255, 255, 1)');
+        gradient.addColorStop(0.7, 'rgba(100, 255, 255, 0.6)');
+        gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(this.x - this.width / 2, this.y, this.width, this.height);
+
+        // 中央コア（より明るい）
+        const coreWidth = this.width * 0.3;
+        const coreGradient = ctx.createLinearGradient(
+            this.x - coreWidth / 2, 0,
+            this.x + coreWidth / 2, 0
+        );
+        coreGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        coreGradient.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
+        coreGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        ctx.fillStyle = coreGradient;
+        ctx.fillRect(this.x - coreWidth / 2, this.y, coreWidth, this.height);
+
+        // グロー効果
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#00ffff';
+
+        // パーティクル
+        for (const p of this.particles) {
+            ctx.globalAlpha = this.alpha * p.alpha;
+            ctx.fillStyle = '#aaffff';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+}
+
+/**
+ * 重力場クラス
+ * ボールを吸い寄せる重力場を生成
+ */
+class GravityWell {
+    constructor(x, y, radius) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius; // 吸引半径
+        this.coreRadius = 15; // 中心の球体半径
+        this.duration = 600; // 10秒（60fps × 10）
+        this.timer = 0;
+        this.finished = false;
+        this.pullStrength = 0.30; // 吸引力（2倍に強化）
+
+        // パーティクル用
+        this.particles = [];
+        this.maxParticles = 20;
+        this.initParticles();
+    }
+
+    /**
+     * パーティクル初期化
+     */
+    initParticles() {
+        for (let i = 0; i < this.maxParticles; i++) {
+            this.particles.push(this.createParticle());
+        }
+    }
+
+    /**
+     * パーティクル生成
+     */
+    createParticle() {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = this.radius * (0.3 + Math.random() * 0.7);
+        return {
+            angle: angle,
+            dist: dist,
+            speed: 0.5 + Math.random() * 1.5,
+            size: 2 + Math.random() * 3
+        };
+    }
+
+    /**
+     * 更新
+     */
+    update() {
+        this.timer++;
+        if (this.timer >= this.duration) {
+            this.finished = true;
+        }
+
+        // パーティクル更新（中心に向かって移動）
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+            p.dist -= p.speed;
+            if (p.dist <= this.coreRadius) {
+                // 中心に到達したらリセット
+                this.particles[i] = this.createParticle();
+            }
+        }
+    }
+
+    /**
+     * ボールへの吸引力を計算
+     */
+    calculatePull(ball) {
+        const dx = this.x - ball.x;
+        const dy = this.y - ball.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > this.radius) {
+            return { x: 0, y: 0 }; // 範囲外
+        }
+
+        // 距離に応じた吸引力（近いほど強い）
+        const strength = this.pullStrength * (1 - distance / this.radius);
+        const normalX = dx / distance;
+        const normalY = dy / distance;
+
+        return {
+            x: normalX * strength,
+            y: normalY * strength
+        };
+    }
+
+    /**
+     * ボールが重力球の中心に触れたか判定
+     */
+    checkCollision(ball) {
+        const dx = this.x - ball.x;
+        const dy = this.y - ball.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < this.coreRadius + ball.radius;
+    }
+
+    /**
+     * 描画
+     */
+    draw(ctx) {
+        if (this.finished) return;
+
+        ctx.save();
+
+        // 残り時間に応じた透明度
+        const lifeRatio = 1 - (this.timer / this.duration);
+        const baseAlpha = Math.min(1, lifeRatio * 2);
+
+        // 吸引範囲（外周リング）
+        ctx.globalAlpha = baseAlpha * 0.2;
+        ctx.strokeStyle = '#8800ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 吸引範囲グラデーション
+        const rangeGradient = ctx.createRadialGradient(
+            this.x, this.y, this.coreRadius,
+            this.x, this.y, this.radius
+        );
+        rangeGradient.addColorStop(0, 'rgba(100, 0, 200, 0.3)');
+        rangeGradient.addColorStop(1, 'rgba(100, 0, 200, 0)');
+        ctx.globalAlpha = baseAlpha;
+        ctx.fillStyle = rangeGradient;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 吸い込みパーティクル
+        ctx.globalAlpha = baseAlpha * 0.8;
+        for (const p of this.particles) {
+            const px = this.x + Math.cos(p.angle) * p.dist;
+            const py = this.y + Math.sin(p.angle) * p.dist;
+
+            ctx.fillStyle = '#cc88ff';
+            ctx.beginPath();
+            ctx.arc(px, py, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 中心の球体
+        ctx.globalAlpha = baseAlpha;
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = 'rgba(150, 0, 255, 0.8)';
+
+        const coreGradient = ctx.createRadialGradient(
+            this.x - this.coreRadius / 3, this.y - this.coreRadius / 3, 0,
+            this.x, this.y, this.coreRadius
+        );
+        coreGradient.addColorStop(0, '#ffffff');
+        coreGradient.addColorStop(0.3, '#cc88ff');
+        coreGradient.addColorStop(1, '#6600cc');
+
+        ctx.fillStyle = coreGradient;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.coreRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+
+/**
+ * 紙吹雪エフェクト
+ */
+class Confetti {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.size = Math.random() * 8 + 4;
+        this.vx = Math.random() * 6 - 3;
+        this.vy = Math.random() * -10 - 5;
+        this.gravity = 0.2;
+        this.rotation = Math.random() * 360;
+        this.rotationSpeed = Math.random() * 10 - 5;
+        this.timer = 0;
+        this.duration = 300;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.rotation += this.rotationSpeed;
+        this.timer++;
+    }
+
+    draw(ctx) {
+        if (this.timer >= this.duration) return;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation * Math.PI / 180);
+
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = Math.max(0, 1 - this.timer / this.duration);
+
+        ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+
+        ctx.restore();
+    }
+}
+
 // エクスポート用（モジュールとして使用する場合）
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { Block, Ball, Paddle, Orb, Explosion };
+    module.exports = { Block, Ball, Paddle, Orb, Explosion, ShockwaveEffect, BeamEffect, GravityWell, Confetti };
 }

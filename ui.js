@@ -3,13 +3,16 @@
 // ========================================
 
 const UI = {
+
     screens: {
         start: document.getElementById('start-screen'),
+        skillSelect: document.getElementById('skill-select-screen'),
         game: document.getElementById('game-screen')
     },
     overlays: {
         pause: document.getElementById('pause-overlay'),
-        gameover: document.getElementById('gameover-overlay')
+        gameover: document.getElementById('gameover-overlay'),
+        help: document.getElementById('help-overlay')
     },
     elements: {
         hpFill: document.getElementById('hp-fill'),
@@ -17,10 +20,10 @@ const UI = {
         orbValue: document.getElementById('orb-value'),
         difficultyBadge: document.getElementById('difficulty-badge'),
         finalScore: document.getElementById('final-score'),
-        skillPenetrate: document.getElementById('skill-penetrate'),
-        skillExplode: document.getElementById('skill-explode'),
-        skillBarExplode: document.getElementById('skill-bar-explode'),
-        skillCancel: document.getElementById('skill-cancel')
+        skillBar: document.getElementById('skill-bar'),
+        skillList: document.getElementById('skills-list'),
+        selectedSlots: document.querySelectorAll('.selected-skill-slot'),
+        gameStartBtn: document.getElementById('game-start-btn')
     },
     buttons: {
         difficulties: document.querySelectorAll('.btn-difficulty'),
@@ -31,8 +34,16 @@ const UI = {
         toStart: document.getElementById('to-start-btn'),
         pauseExit: document.getElementById('pause-exit-btn'),
         gameoverRestart: document.getElementById('gameover-restart-btn'),
-        gameoverStart: document.getElementById('gameover-start-btn')
+        gameoverStart: document.getElementById('gameover-start-btn'),
+        backToDifficulty: document.getElementById('back-to-difficulty-btn'),
+        restartSkill: document.getElementById('restart-skill-btn'),
+        startHelp: document.getElementById('start-help-btn'),
+        pauseHelp: document.getElementById('pause-help-btn'),
+        helpBack: document.getElementById('help-back-btn')
     },
+
+    // コールバック保持
+    callbacks: {},
 
     /**
      * 画面を切り替え
@@ -98,6 +109,35 @@ const UI = {
     },
 
     /**
+     * 最終スコアを表示（ゲームオーバー画面用）
+     */
+    /**
+     * 最終スコアを表示（ゲームオーバー画面用）
+     */
+    showFinalScore(score, highScore, isNewRecord) {
+        const finalScoreEl = document.getElementById('final-score');
+        const highScoreContainer = document.getElementById('final-highscore-container');
+        const highScoreEl = document.getElementById('final-highscore');
+        const newRecordMsg = document.getElementById('new-record-msg');
+
+        if (finalScoreEl) {
+            finalScoreEl.textContent = score.toLocaleString();
+        }
+
+        if (highScoreContainer && highScoreEl) {
+            highScoreContainer.style.display = 'block';
+            highScoreEl.textContent = highScore.toLocaleString();
+
+            if (isNewRecord && newRecordMsg) {
+                newRecordMsg.style.display = 'block';
+                newRecordMsg.textContent = 'NEW RECORD!!';
+            } else if (newRecordMsg) {
+                newRecordMsg.style.display = 'none';
+            }
+        }
+    },
+
+    /**
      * オーブ数を更新
      */
     updateOrbs(orbs, maxOrbs) {
@@ -106,6 +146,52 @@ const UI = {
         } else {
             this.elements.orbValue.textContent = orbs;
         }
+    },
+
+    /**
+     * コンボ数を更新
+     */
+    updateCombo(combo, bonus) {
+        const comboEl = document.getElementById('combo-container');
+        const comboValueEl = document.getElementById('combo-value');
+        const comboBonusEl = document.getElementById('combo-bonus');
+
+        if (comboEl && comboValueEl && comboBonusEl) {
+            if (combo > 0) {
+                comboEl.style.display = 'flex';
+                comboValueEl.textContent = `${combo} COMBO`;
+                if (bonus > 0) {
+                    comboBonusEl.textContent = `+${bonus}%`;
+                    comboBonusEl.style.display = 'block';
+                } else {
+                    comboBonusEl.style.display = 'none';
+                }
+            } else {
+                comboEl.style.display = 'none';
+            }
+        }
+    },
+
+    /**
+     * メインメニューのハイスコア表示を更新
+     */
+    updateMainMenuHighScores(highScores) {
+        const difficultyButtons = document.querySelectorAll('.btn-difficulty');
+        difficultyButtons.forEach(btn => {
+            const difficulty = btn.dataset.difficulty;
+            const score = highScores[difficulty] || 0;
+
+            let scoreEl = btn.querySelector('.highscore-display');
+            if (!scoreEl) {
+                scoreEl = document.createElement('div');
+                scoreEl.className = 'highscore-display';
+                scoreEl.style.fontSize = '0.8rem';
+                scoreEl.style.color = '#ffd700';
+                scoreEl.style.marginTop = '4px';
+                btn.appendChild(scoreEl);
+            }
+            scoreEl.textContent = `ハイスコア: ${score.toLocaleString()}`;
+        });
     },
 
     /**
@@ -131,57 +217,213 @@ const UI = {
     },
 
     /**
-     * 最終スコアを表示
+     * スキル選択リストを描画
      */
-    showFinalScore(score) {
-        this.elements.finalScore.textContent = score.toLocaleString();
+    renderSkillsList(allSkills, selectedSkills) {
+        this.elements.skillList.innerHTML = '';
+
+        allSkills.forEach(skill => {
+            const card = document.createElement('div');
+            card.className = 'skill-card';
+            if (selectedSkills.includes(skill.id)) {
+                card.classList.add('selected');
+            }
+
+            card.innerHTML = `
+                <div class="skill-card-icon">${skill.icon}</div>
+                <div class="skill-card-name">${skill.name}</div>
+                <div class="skill-card-cost">${skill.cost}</div>
+            `;
+
+            card.addEventListener('click', () => {
+                if (this.callbacks.onSkillSelectToggle) {
+                    this.callbacks.onSkillSelectToggle(skill.id);
+                }
+            });
+
+            this.elements.skillList.appendChild(card);
+        });
+
+        // 選択スロットの更新
+        this.updateSelectedSlots(allSkills, selectedSkills);
+
+        // 開始ボタンの状態更新
+        if (selectedSkills.length === 3) {
+            this.elements.gameStartBtn.classList.remove('disabled');
+        } else {
+            this.elements.gameStartBtn.classList.add('disabled');
+        }
+    },
+
+    /**
+     * 選択スロットを更新
+     */
+    updateSelectedSlots(allSkills, selectedSkills) {
+        this.elements.selectedSlots.forEach((slot, index) => {
+            const skillId = selectedSkills[index];
+            if (skillId) {
+                const skill = allSkills.find(s => s.id === skillId);
+                slot.className = 'selected-skill-slot filled';
+                slot.innerHTML = `
+                    <div style="font-size: 1.5rem;">${skill.icon}</div>
+                    <div>${skill.name}</div>
+                `;
+                slot.onclick = () => {
+                    if (this.callbacks.onSkillSelectToggle) {
+                        this.callbacks.onSkillSelectToggle(skillId);
+                    }
+                };
+            } else {
+                slot.className = 'selected-skill-slot';
+                slot.textContent = '空き';
+                slot.onclick = null;
+            }
+        });
+    },
+
+
+
+    /**
+     * ヘルプ画面のスキル一覧を生成
+     */
+    renderHelpSkills(skills) {
+        const container = document.getElementById('help-skills-list');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        Object.values(skills).forEach(skill => {
+            const skillItem = document.createElement('div');
+            skillItem.className = 'help-skill-item';
+
+            const icon = document.createElement('div');
+            icon.className = 'help-skill-icon';
+            // アイコン表示
+            icon.textContent = skill.icon;
+
+            const info = document.createElement('div');
+            info.className = 'help-skill-info';
+
+            const name = document.createElement('div');
+            name.className = 'help-skill-name';
+            name.textContent = skill.name;
+
+            const cost = document.createElement('div');
+            cost.className = 'help-skill-cost';
+            cost.textContent = `消費オーブ: ${skill.cost}`;
+
+            const desc = document.createElement('div');
+            desc.className = 'help-skill-desc';
+            desc.textContent = skill.description;
+
+            info.appendChild(name);
+            info.appendChild(cost);
+            info.appendChild(desc);
+
+            skillItem.appendChild(icon);
+            skillItem.appendChild(info);
+
+            container.appendChild(skillItem);
+        });
+    },
+
+    /**
+     * ゲーム画面のスキルバーを描画（動的生成）
+     */
+    renderSkillBar(allSkills, selectedSkills) {
+        this.elements.skillBar.innerHTML = '';
+
+        // カギカッコ付きキー割り当てガイド (固定: 1番目=Q, 2番目=E, 3番目=R)
+        const keys = ['Q', 'E', 'R'];
+
+        selectedSkills.forEach((skillId, index) => {
+            const skill = allSkills.find(s => s.id === skillId);
+            if (!skill) return;
+
+            const btn = document.createElement('button');
+            btn.className = 'skill-btn';
+            btn.dataset.skillId = skillId;
+            btn.disabled = true;
+            btn.id = `skill-btn-${skillId}`;
+
+            btn.innerHTML = `
+                <div class="skill-key">${keys[index]}</div>
+                <div class="skill-icon">${skill.icon}</div>
+                <div class="skill-name">${skill.name}</div>
+                <div class="skill-cost">${skill.cost}</div>
+            `;
+
+            btn.addEventListener('click', () => {
+                if (this.callbacks.onSkillTrigger) {
+                    this.callbacks.onSkillTrigger(skillId);
+                }
+            });
+
+            this.elements.skillBar.appendChild(btn);
+        });
+
+        // セパレーター
+        const separator = document.createElement('div');
+        separator.className = 'skill-separator';
+        this.elements.skillBar.appendChild(separator);
+
+        // キャンセルボタン
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'skill-btn skill-cancel';
+        cancelBtn.id = 'skill-cancel';
+        cancelBtn.disabled = true;
+        cancelBtn.innerHTML = `
+            <div class="skill-key">C</div>
+            <div class="skill-icon">↩️</div>
+            <div class="skill-name">解除</div>
+            <div class="skill-cost">返金</div>
+        `;
+
+        cancelBtn.addEventListener('click', () => {
+            if (this.callbacks.onSkillCancel) {
+                this.callbacks.onSkillCancel();
+            }
+        });
+
+        this.elements.skillBar.appendChild(cancelBtn);
     },
 
     /**
      * スキルボタンの有効/無効を更新
      */
-    updateSkillButtons(orbs, penetrateCost, explodeCost, barExplodeCost, paddleEnhanced, ballExplodable) {
-        // 貫通スキル
-        if (orbs >= penetrateCost && !paddleEnhanced) {
-            this.elements.skillPenetrate.disabled = false;
-        } else {
-            this.elements.skillPenetrate.disabled = true;
-        }
+    updateSkillButtons(orbs, allSkills, selectedSkills, paddleEnhanced, ballExplodable) {
+        selectedSkills.forEach(skillId => {
+            const skill = allSkills.find(s => s.id === skillId);
+            const btn = document.getElementById(`skill-btn-${skillId}`);
+            if (!btn || !skill) return;
 
-        // 爆破スキル
-        if (ballExplodable) {
-            // 爆破可能状態なら発動ボタンとして使用
-            this.elements.skillExplode.disabled = false;
-            this.elements.skillExplode.classList.add('explode-ready');
-            this.elements.skillExplode.classList.remove('active');
-        } else if (orbs >= explodeCost && !paddleEnhanced) {
-            this.elements.skillExplode.disabled = false;
-            this.elements.skillExplode.classList.remove('explode-ready');
-        } else {
-            this.elements.skillExplode.disabled = true;
-            this.elements.skillExplode.classList.remove('explode-ready');
-        }
+            // 爆破スキルの特殊判定
+            if (skillId === 'explode' && ballExplodable) {
+                btn.disabled = false;
+                btn.classList.add('explode-ready');
+            } else if (orbs >= skill.cost && !paddleEnhanced) {
+                btn.disabled = false;
+                btn.classList.remove('explode-ready');
+            } else {
+                btn.disabled = true;
+                btn.classList.remove('explode-ready');
+            }
+        });
 
-        // バー爆破スキル
-        if (orbs >= barExplodeCost) {
-            this.elements.skillBarExplode.disabled = false;
-        } else {
-            this.elements.skillBarExplode.disabled = true;
-        }
-
-        // 解除ボタン（スキル発動待機中のみ有効）
-        if (paddleEnhanced) {
-            this.elements.skillCancel.disabled = false;
-        } else {
-            this.elements.skillCancel.disabled = true;
+        // 解除ボタン
+        const cancelBtn = document.getElementById('skill-cancel');
+        if (cancelBtn) {
+            cancelBtn.disabled = !paddleEnhanced;
         }
     },
 
     /**
      * スキルボタンのアクティブ状態を設定
      */
-    setSkillActive(skillName, active) {
-        const btn = skillName === 'penetrate' ? this.elements.skillPenetrate : this.elements.skillExplode;
+    setSkillActive(skillId, active) {
+        const btn = document.getElementById(`skill-btn-${skillId}`);
+        if (!btn) return;
+
         if (active) {
             btn.classList.add('active');
         } else {
@@ -193,6 +435,8 @@ const UI = {
      * イベントリスナーを設定
      */
     setupEventListeners(callbacks) {
+        this.callbacks = callbacks; // コールバックを保存
+
         // 難易度選択ボタン
         this.buttons.difficulties.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -203,15 +447,42 @@ const UI = {
             });
         });
 
+        // 戻るボタン
+        if (this.buttons.backToDifficulty) {
+            this.buttons.backToDifficulty.addEventListener('click', () => {
+                if (callbacks.onBackToDifficulty) callbacks.onBackToDifficulty();
+            });
+        }
+
+        // ゲーム開始ボタン
+        if (this.elements.gameStartBtn) {
+            this.elements.gameStartBtn.addEventListener('click', () => {
+                // disabledでない場合のみ発火
+                if (!this.elements.gameStartBtn.classList.contains('disabled')) {
+                    if (callbacks.onGameStart) callbacks.onGameStart();
+                }
+            });
+        }
+
         // 終了ボタン
         this.buttons.exit.addEventListener('click', () => {
             if (callbacks.onExit) callbacks.onExit();
         });
 
+        // ヘッダ（HUD）クリックでポーズ
+        const gameHud = document.getElementById('game-hud');
+        if (gameHud) {
+            gameHud.addEventListener('click', () => {
+                if (callbacks.onPause) callbacks.onPause();
+            });
+        }
+
+        /* ポーズボタン削除に伴い廃止
         // ポーズボタン
         this.buttons.pause.addEventListener('click', () => {
             if (callbacks.onPause) callbacks.onPause();
         });
+        */
 
         // 再開ボタン
         this.buttons.resume.addEventListener('click', () => {
@@ -243,21 +514,34 @@ const UI = {
             if (callbacks.onToStart) callbacks.onToStart();
         });
 
-        // スキルボタン
-        this.elements.skillPenetrate.addEventListener('click', () => {
-            if (callbacks.onSkillPenetrate) callbacks.onSkillPenetrate();
-        });
+        // スキル選択からやり直し
+        if (this.buttons.restartSkill) {
+            this.buttons.restartSkill.addEventListener('click', () => {
+                if (callbacks.onRestartSkill) callbacks.onRestartSkill();
+            });
+        }
 
-        this.elements.skillExplode.addEventListener('click', () => {
-            if (callbacks.onSkillExplode) callbacks.onSkillExplode();
-        });
+        // スタート画面のヘルプ
+        if (this.buttons.startHelp) {
+            this.buttons.startHelp.addEventListener('click', () => {
+                this.showOverlay('help');
+                if (callbacks.onShowHelp) callbacks.onShowHelp();
+            });
+        }
 
-        this.elements.skillBarExplode.addEventListener('click', () => {
-            if (callbacks.onSkillBarExplode) callbacks.onSkillBarExplode();
-        });
+        // ポーズ画面のヘルプ
+        if (this.buttons.pauseHelp) {
+            this.buttons.pauseHelp.addEventListener('click', () => {
+                this.showOverlay('help');
+                if (callbacks.onShowHelp) callbacks.onShowHelp();
+            });
+        }
 
-        this.elements.skillCancel.addEventListener('click', () => {
-            if (callbacks.onSkillCancel) callbacks.onSkillCancel();
-        });
-    }
+        // ヘルプ画面の閉じる
+        if (this.buttons.helpBack) {
+            this.buttons.helpBack.addEventListener('click', () => {
+                this.hideOverlay('help');
+            });
+        }
+    },
 };
