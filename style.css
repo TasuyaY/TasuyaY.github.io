@@ -1,0 +1,573 @@
+/* ========================================
+   デザインシステム - カスタムプロパティ
+======================================== */
+:root {
+    /* カラーパレット */
+    --bg-primary: #0a0a1a;
+    --bg-secondary: #12122a;
+    --bg-tertiary: #1a1a3a;
+    --accent-primary: #00ffff;
+    --accent-secondary: #ff00ff;
+    --accent-gradient: linear-gradient(135deg, #00ffff, #ff00ff);
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0c0;
+    --danger: #ff4444;
+    --success: #44ff88;
+    --warning: #ffaa00;
+
+    /* ブロックカラー */
+    --block-hp1: #44ff44;
+    --block-hp2: #00ffff;
+    --block-hp3: #ffff00;
+    --block-hp4: #ff8800;
+    --block-hp5: #ff4444;
+
+    /* オーブカラー */
+    --orb-color: #aa88ff;
+
+    /* スペーシング */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+
+    /* ボーダー */
+    --border-radius: 12px;
+    --border-radius-lg: 20px;
+
+    /* シャドウ */
+    --shadow-glow: 0 0 20px rgba(0, 255, 255, 0.3);
+    --shadow-glow-strong: 0 0 40px rgba(0, 255, 255, 0.5);
+
+    /* トランジション */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.3s ease;
+}
+
+/* ========================================
+   ベーススタイル
+======================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+/* ========================================
+   ゲームコンテナ
+======================================== */
+#game-container {
+    /* 固定アスペクト比 (9:16 スマホ比率) */
+    --game-aspect-ratio: 9 / 16;
+    --game-max-width: 450px;
+
+    width: 100vw;
+    height: 100vh;
+    max-width: var(--game-max-width);
+    max-height: calc(var(--game-max-width) / (9 / 16));
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(0, 255, 255, 0.1);
+}
+
+/* 画面全体の背景 */
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #050510;
+}
+
+/* ========================================
+   画面共通
+======================================== */
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.screen.active {
+    display: flex;
+}
+
+/* ========================================
+   スタート画面
+======================================== */
+#start-screen {
+    background: radial-gradient(ellipse at center, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.title-container {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    animation: fadeInDown 0.8s ease;
+}
+
+.game-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    font-weight: 900;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 60px rgba(0, 255, 255, 0.5);
+    letter-spacing: 0.1em;
+}
+
+.game-subtitle {
+    font-size: clamp(1rem, 3vw, 1.5rem);
+    color: var(--text-secondary);
+    margin-top: var(--spacing-sm);
+    letter-spacing: 0.3em;
+}
+
+.menu-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    animation: fadeInUp 0.8s ease 0.2s both;
+}
+
+.select-label {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: var(--spacing-sm);
+}
+
+/* ========================================
+   ボタン
+======================================== */
+.btn {
+    position: relative;
+    padding: var(--spacing-md) var(--spacing-xl);
+    min-width: 280px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    overflow: hidden;
+    transition: all var(--transition-normal);
+    backdrop-filter: blur(10px);
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn:hover::before {
+    left: 100%;
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-2px);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-text {
+    display: block;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.btn-desc {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: var(--spacing-xs);
+}
+
+.btn-difficulty[data-difficulty="easy"]:hover {
+    border-color: var(--block-hp1);
+    box-shadow: 0 0 20px rgba(68, 255, 68, 0.3);
+}
+
+.btn-difficulty[data-difficulty="normal"]:hover {
+    border-color: var(--block-hp2);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+.btn-difficulty[data-difficulty="hard"]:hover {
+    border-color: var(--block-hp4);
+    box-shadow: 0 0 20px rgba(255, 136, 0, 0.3);
+}
+
+.btn-difficulty[data-difficulty="extreme"]:hover {
+    border-color: var(--block-hp5);
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
+}
+
+.btn-exit:hover {
+    border-color: var(--danger);
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
+}
+
+/* ========================================
+   ゲーム画面
+======================================== */
+#game-screen {
+    flex-direction: column;
+    padding: 0;
+}
+
+#game-hud {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 10;
+}
+
+.hud-left,
+.hud-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.hud-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.hud-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.hud-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    min-width: 60px;
+    text-align: right;
+}
+
+.orb-value {
+    color: var(--orb-color);
+}
+
+.hp-bar {
+    width: 150px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hp-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, var(--danger), var(--warning), var(--success));
+    background-size: 200% 100%;
+    background-position: right;
+    transition: width var(--transition-normal);
+    border-radius: 10px;
+}
+
+.difficulty-badge {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-pause {
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-pause:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-glow);
+}
+
+#game-canvas {
+    flex: 1;
+    width: 100%;
+    display: block;
+    background: transparent;
+}
+
+/* ========================================
+   スキルバー
+======================================== */
+#skill-bar {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.skill-separator {
+    width: 1px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 0 var(--spacing-sm);
+}
+
+.skill-btn {
+    position: relative;
+    width: 100px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    text-align: center;
+}
+
+.skill-btn:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-3px);
+}
+
+.skill-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.skill-btn.active {
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+    animation: pulse 1s infinite;
+}
+
+.skill-btn.explode-ready {
+    border-color: var(--warning);
+    box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+    animation: pulse 0.5s infinite;
+}
+
+.skill-icon {
+    font-size: 1.5rem;
+    margin-bottom: var(--spacing-xs);
+}
+
+.skill-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.skill-cost {
+    font-size: 0.75rem;
+    color: var(--orb-color);
+    margin-top: var(--spacing-xs);
+}
+
+.skill-key {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 22px;
+    height: 22px;
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 255, 255, 0.4);
+}
+
+/* ========================================
+   オーバーレイ共通
+======================================== */
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.overlay.active {
+    display: flex;
+}
+
+.overlay-content {
+    text-align: center;
+    animation: fadeInUp 0.3s ease;
+}
+
+.overlay-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    margin-bottom: var(--spacing-xl);
+    color: var(--accent-primary);
+}
+
+.gameover-title {
+    color: var(--danger);
+    text-shadow: 0 0 30px rgba(255, 68, 68, 0.5);
+}
+
+.final-score {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.5rem;
+    margin-bottom: var(--spacing-xl);
+    color: var(--text-secondary);
+}
+
+.final-score span {
+    color: var(--accent-primary);
+}
+
+.btn-overlay {
+    margin-bottom: var(--spacing-md);
+}
+
+/* ========================================
+   アニメーション
+======================================== */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes glow {
+
+    0%,
+    100% {
+        box-shadow: var(--shadow-glow);
+    }
+
+    50% {
+        box-shadow: var(--shadow-glow-strong);
+    }
+}
+
+/* ========================================
+   レスポンシブ
+======================================== */
+@media (max-width: 768px) {
+    .btn {
+        min-width: 240px;
+        padding: var(--spacing-sm) var(--spacing-lg);
+    }
+
+    .btn-text {
+        font-size: 1rem;
+    }
+
+    #game-hud {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .hp-bar {
+        width: 100px;
+    }
+
+    .hud-left,
+    .hud-right {
+        gap: var(--spacing-md);
+    }
+
+    .skill-btn {
+        width: 80px;
+    }
+}

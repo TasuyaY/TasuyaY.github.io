@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<!-- Antigra による生成-->
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swift Orbit - ブロック崩し</title>
+    <meta name="description" content="ブロックが迫りくる緊張感あふれるブロック崩しゲーム">
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@400;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div id="game-container">
+        <!-- スタート画面 -->
+        <div id="start-screen" class="screen active">
+            <div class="title-container">
+                <h1 class="game-title">SWIFT ORBIT</h1>
+                <p class="game-subtitle">ブロック崩し</p>
+            </div>
+            <div class="menu-container">
+                <p class="select-label">難易度を選択</p>
+                <button class="btn btn-difficulty" data-difficulty="easy">
+                    <span class="btn-text">簡単</span>
+                    <span class="btn-desc">初心者向け</span>
+                </button>
+                <button class="btn btn-difficulty" data-difficulty="normal">
+                    <span class="btn-text">普通</span>
+                    <span class="btn-desc">標準的な難易度</span>
+                </button>
+                <button class="btn btn-difficulty" data-difficulty="hard">
+                    <span class="btn-text">難しい</span>
+                    <span class="btn-desc">上級者向け</span>
+                </button>
+                <button class="btn btn-difficulty" data-difficulty="extreme">
+                    <span class="btn-text">極み</span>
+                    <span class="btn-desc">究極の挑戦</span>
+                </button>
+                <button class="btn btn-exit" id="exit-btn">
+                    <span class="btn-text">ゲーム終了</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="game-screen" class="screen">
+            <div id="game-hud">
+                <div class="hud-left">
+                    <div class="hud-item">
+                        <span class="hud-label">HP</span>
+                        <div class="hp-bar">
+                            <div class="hp-fill" id="hp-fill"></div>
+                        </div>
+                    </div>
+                    <div class="hud-item">
+                        <span class="hud-label">スコア</span>
+                        <span class="hud-value" id="score-value">0</span>
+                    </div>
+                </div>
+                <div class="hud-center">
+                    <span class="difficulty-badge" id="difficulty-badge"></span>
+                </div>
+                <div class="hud-right">
+                    <div class="hud-item">
+                        <span class="hud-label">オーブ</span>
+                        <span class="hud-value orb-value" id="orb-value">0</span>
+                    </div>
+                    <button class="btn-pause" id="pause-btn">⏸</button>
+                </div>
+            </div>
+            <canvas id="game-canvas"></canvas>
+            <div id="skill-bar">
+                <button class="skill-btn" id="skill-penetrate" data-skill="penetrate" disabled>
+                    <div class="skill-key">Q</div>
+                    <div class="skill-icon">🔥</div>
+                    <div class="skill-name">貫通</div>
+                    <div class="skill-cost">30</div>
+                </button>
+                <button class="skill-btn" id="skill-explode" data-skill="explode" disabled>
+                    <div class="skill-key">E</div>
+                    <div class="skill-icon">💥</div>
+                    <div class="skill-name">爆破</div>
+                    <div class="skill-cost">50</div>
+                </button>
+                <button class="skill-btn" id="skill-bar-explode" data-skill="barExplode" disabled>
+                    <div class="skill-key">R</div>
+                    <div class="skill-icon">💣</div>
+                    <div class="skill-name">バー爆破</div>
+                    <div class="skill-cost">100</div>
+                </button>
+                <div class="skill-separator"></div>
+                <button class="skill-btn skill-cancel" id="skill-cancel" disabled>
+                    <div class="skill-key">C</div>
+                    <div class="skill-icon">↩️</div>
+                    <div class="skill-name">解除</div>
+                    <div class="skill-cost">返金</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- ポーズ画面オーバーレイ -->
+        <div id="pause-overlay" class="overlay">
+            <div class="overlay-content">
+                <h2 class="overlay-title">一時停止</h2>
+                <button class="btn btn-overlay" id="resume-btn">
+                    <span class="btn-text">ゲームに戻る</span>
+                </button>
+                <button class="btn btn-overlay" id="restart-btn">
+                    <span class="btn-text">最初からやり直し</span>
+                </button>
+                <button class="btn btn-overlay" id="to-start-btn">
+                    <span class="btn-text">スタート画面に戻る</span>
+                </button>
+                <button class="btn btn-overlay btn-exit" id="pause-exit-btn">
+                    <span class="btn-text">ゲーム終了</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ゲームオーバー画面オーバーレイ -->
+        <div id="gameover-overlay" class="overlay">
+            <div class="overlay-content">
+                <h2 class="overlay-title gameover-title">GAME OVER</h2>
+                <p class="final-score">スコア: <span id="final-score">0</span></p>
+                <button class="btn btn-overlay" id="gameover-restart-btn">
+                    <span class="btn-text">もう一度プレイ</span>
+                </button>
+                <button class="btn btn-overlay" id="gameover-start-btn">
+                    <span class="btn-text">スタート画面に戻る</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="entities.js"></script>
+    <script src="ui.js"></script>
+    <script src="game.js"></script>
+</body>
+
+</html>
