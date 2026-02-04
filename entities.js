@@ -181,8 +181,8 @@ class Ball {
         this.x = x;
         this.y = y;
         this.radius = radius;
-        this.speed = 4.8; // 0.8倍に調整
-        this.maxSpeed = 4.2; // 速度上限（元の70%）
+        this.speed = 4.2; // 速度（maxSpeedと同じ）
+        this.maxSpeed = 4.2; // 速度上限
         this.dx = this.speed * (Math.random() > 0.5 ? 1 : -1);
         this.dy = -this.speed;
 

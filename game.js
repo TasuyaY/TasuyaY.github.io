@@ -2257,6 +2257,11 @@ const Game = {
     pauseGame() {
         this.paused = true;
         UI.showOverlay('pause');
+        // ローグライトモードではスキル選択ボタンを非表示
+        const skillRestartBtn = document.getElementById('restart-skill-btn');
+        if (skillRestartBtn) {
+            skillRestartBtn.style.display = this.gameMode === 'roguelite' ? 'none' : '';
+        }
     },
 
     /**
