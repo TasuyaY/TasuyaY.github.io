@@ -288,8 +288,14 @@ const Game = {
         this.canvas = document.getElementById('game-canvas');
         this.ctx = this.canvas.getContext('2d');
 
+        // モバイルブラウザのビューポート高さ対応
+        this.setViewportHeight();
+        window.addEventListener('resize', () => {
+            this.setViewportHeight();
+            this.resizeCanvas();
+        });
+
         this.resizeCanvas();
-        window.addEventListener('resize', () => this.resizeCanvas());
 
         // ハイスコア読み込み
         this.loadHighScores();
@@ -297,6 +303,15 @@ const Game = {
 
         this.setupInputHandlers();
         this.setupUICallbacks();
+    },
+
+    /**
+     * ビューポート高さを動的に設定（モバイルブラウザ対応）
+     */
+    setViewportHeight() {
+        // window.innerHeightを使用してアドレスバーを除いた実際の高さを取得
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
     },
 
     /**
