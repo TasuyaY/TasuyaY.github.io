@@ -713,5 +713,50 @@ const UI = {
     hideSkillSwapSelection() {
         this.hideOverlay('skillSwap');
     },
+
+    /**
+     * カウントダウン表示
+     */
+    showCountdown(count) {
+        let overlay = document.getElementById('countdown-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'countdown-overlay';
+            overlay.className = 'countdown-overlay';
+            document.body.appendChild(overlay);
+        }
+        overlay.textContent = count;
+        overlay.style.display = 'flex';
+        overlay.classList.add('countdown-animate');
+        // アニメーション再トリガー
+        setTimeout(() => overlay.classList.remove('countdown-animate'), 100);
+    },
+
+    /**
+     * カウントダウン非表示
+     */
+    hideCountdown() {
+        const overlay = document.getElementById('countdown-overlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    },
+
+    /**
+     * ダメージフラッシュ表示
+     */
+    showDamageFlash() {
+        let flash = document.getElementById('damage-flash');
+        if (!flash) {
+            flash = document.createElement('div');
+            flash.id = 'damage-flash';
+            flash.className = 'damage-flash';
+            document.body.appendChild(flash);
+        }
+        flash.classList.remove('active');
+        // 強制リフロー
+        void flash.offsetWidth;
+        flash.classList.add('active');
+    },
 };
 

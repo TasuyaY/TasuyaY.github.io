@@ -591,10 +591,11 @@ const Game = {
         this.paused = false;
         this.gameOver = false;
 
-        setTimeout(() => {
+        // カウントダウン後にゲームを開始
+        this.startCountdown(() => {
             this.running = true;
             this.gameLoop();
-        }, 50);
+        });
     },
 
     /**
@@ -636,10 +637,11 @@ const Game = {
         this.paused = false;
         this.gameOver = false;
 
-        setTimeout(() => {
+        // カウントダウン後にゲームを開始
+        this.startCountdown(() => {
             this.running = true;
             this.gameLoop();
-        }, 50);
+        });
     },
 
     /**
@@ -1015,6 +1017,25 @@ const Game = {
         }
 
         return effectDef.getEffect(level);
+    },
+
+    /**
+     * カウントダウンを開始してからコールバックを実行
+     */
+    startCountdown(callback) {
+        let count = 3;
+        UI.showCountdown(count);
+
+        const countInterval = setInterval(() => {
+            count--;
+            if (count > 0) {
+                UI.showCountdown(count);
+            } else {
+                clearInterval(countInterval);
+                UI.hideCountdown();
+                if (callback) callback();
+            }
+        }, 1000);
     },
 
     /**
@@ -1680,6 +1701,7 @@ const Game = {
                 this.player.comboBonus = 0;
                 UI.updateCombo(0, 0);
                 UI.updateHP(this.player.hp, this.player.maxHp);
+                UI.showDamageFlash(); // ダメージフラッシュ
 
                 // ブロックを破壊
                 this.blocks.splice(i, 1);

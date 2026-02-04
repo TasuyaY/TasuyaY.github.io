@@ -353,6 +353,9 @@ body {
 #game-hud {
     width: 100%;
     padding: var(--spacing-md) var(--spacing-lg);
+    /* モバイルsafe-area対応 */
+    padding-top: max(var(--spacing-md), env(safe-area-inset-top, 0px));
+    min-height: 50px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -363,6 +366,7 @@ body {
     box-sizing: border-box;
     overflow: visible;
     position: relative;
+    flex-shrink: 0;
 }
 
 .hud-left,
@@ -1310,5 +1314,76 @@ body {
 
     .btn {
         min-width: 90%;
+    }
+}
+
+/* ========================================
+   カウントダウン表示
+======================================== */
+.countdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 10000;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 8rem;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 30px var(--accent-primary),
+        0 0 60px var(--accent-secondary);
+}
+
+.countdown-animate {
+    animation: countdownPulse 0.5s ease-out;
+}
+
+@keyframes countdownPulse {
+    0% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* ========================================
+   ダメージフラッシュ
+======================================== */
+.damage-flash {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 9000;
+    box-shadow: inset 0 0 100px 30px rgba(255, 0, 0, 0);
+    transition: box-shadow 0.1s ease-out;
+}
+
+.damage-flash.active {
+    animation: damageFlashAnim 0.4s ease-out;
+}
+
+@keyframes damageFlashAnim {
+    0% {
+        box-shadow: inset 0 0 100px 30px rgba(255, 0, 0, 0.8);
+    }
+
+    100% {
+        box-shadow: inset 0 0 100px 30px rgba(255, 0, 0, 0);
     }
 }
