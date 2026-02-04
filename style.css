@@ -21,6 +21,10 @@
     --block-hp3: #ffff00;
     --block-hp4: #ff8800;
     --block-hp5: #ff4444;
+    --block-hp10: #88ffff;
+    /* ダイヤモンド */
+    --block-hp20: #111111;
+    /* 黒曜石 */
 
     /* オーブカラー */
     --orb-color: #aa88ff;

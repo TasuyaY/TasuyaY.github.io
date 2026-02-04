@@ -26,9 +26,11 @@ class Block {
             2: '#00ffff',  // シアン
             3: '#ffff00',  // 黄
             4: '#ff8800',  // オレンジ
-            5: '#ff4444'   // 赤
+            5: '#ff4444',  // 赤
+            10: '#b9f2ff', // ダイヤモンド（より宝石らしい輝き）
+            20: '#1a1a1a'  // 黒曜石（深い黒）
         };
-        return colors[this.maxHp] || colors[1];
+        return colors[this.maxHp] || colors[5];
     }
 
     /**
@@ -61,34 +63,122 @@ class Block {
         const baseColor = this.getColor();
         const darken = this.getDarkenFactor();
 
-        // ベースブロック描画
         ctx.save();
 
-        // グラデーション
-        const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
-        gradient.addColorStop(0, this.adjustBrightness(baseColor, darken + 0.1));
-        gradient.addColorStop(1, this.adjustBrightness(baseColor, darken - 0.1));
+        // 特殊ブロックの描画ロジック
+        if (this.maxHp === 10) {
+            // --- ダイヤモンドブロック (宝石的な見た目) ---
+            const x = this.x + 2;
+            const y = this.y + 2;
+            const w = this.width - 4;
+            const h = this.height - 4;
 
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.roundRect(this.x + 2, this.y + 2, this.width - 4, this.height - 4, 4);
-        ctx.fill();
+            // 本体グラデーション
+            const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.3, '#b9f2ff');
+            grad.addColorStop(1, '#66ccff');
 
-        // 光沢
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.beginPath();
-        ctx.roundRect(this.x + 4, this.y + 4, this.width - 8, (this.height - 4) / 3, 2);
-        ctx.fill();
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 4);
+            ctx.fill();
 
-        // ヒビ割れ描画
-        this.drawCracks(ctx);
+            // ダイヤモンドカット風の輝き
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            // X字のハイライト
+            ctx.moveTo(x, y); ctx.lineTo(x + w, y + h);
+            ctx.moveTo(x + w, y); ctx.lineTo(x, y + h);
+            // 十字
+            ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h);
+            ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2);
+            ctx.stroke();
 
-        // ボーダー
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(this.x + 2, this.y + 2, this.width - 4, this.height - 4, 4);
-        ctx.stroke();
+            // 中心部の強い輝き
+            const innerGrad = ctx.createRadialGradient(x + w / 2, y + h / 2, 0, x + w / 2, y + h / 2, w / 2);
+            innerGrad.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+            innerGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = innerGrad;
+            ctx.fillRect(x, y, w, h);
+
+            // キラキラ粒子 (アニメーション効果的に動くわけではないが、アクセントとして)
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 4; i++) {
+                const px = x + w * [0.2, 0.8, 0.3, 0.7][i];
+                const py = y + h * [0.3, 0.2, 0.7, 0.8][i];
+                ctx.beginPath();
+                ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+        } else if (this.maxHp === 20) {
+            // --- 黒曜石ブロック (強い光沢) ---
+            const x = this.x + 2;
+            const y = this.y + 2;
+            const w = this.width - 4;
+            const h = this.height - 4;
+
+            // 深い黒のベース
+            ctx.fillStyle = '#0a0a0a';
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 2);
+            ctx.fill();
+
+            // エッジのハイライト
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
+
+            // 鋭い反射光
+            const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+            grad.addColorStop(0, 'rgba(100, 100, 100, 0.8)');
+            grad.addColorStop(0.1, 'rgba(255, 255, 255, 0.1)');
+            grad.addColorStop(0.2, 'rgba(0, 0, 0, 0)');
+            grad.addColorStop(0.8, 'rgba(0, 0, 0, 0)');
+            grad.addColorStop(0.9, 'rgba(255, 255, 255, 0.2)');
+            grad.addColorStop(1, 'rgba(80, 80, 80, 0.4)');
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, y, w, h);
+
+            // 斜めの鋭いスリット
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.1, y);
+            ctx.lineTo(x + w * 0.4, y + h);
+            ctx.stroke();
+
+        } else {
+            // --- 通常ブロック ---
+            // グラデーション
+            const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+            gradient.addColorStop(0, this.adjustBrightness(baseColor, darken + 0.1));
+            gradient.addColorStop(1, this.adjustBrightness(baseColor, darken - 0.1));
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(this.x + 2, this.y + 2, this.width - 4, this.height - 4, 4);
+            ctx.fill();
+
+            // 光沢
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.beginPath();
+            ctx.roundRect(this.x + 4, this.y + 4, this.width - 8, (this.height - 4) / 3, 2);
+            ctx.fill();
+
+            // ヒビ割れ描画 (HPが減った時のみ)
+            this.drawCracks(ctx);
+
+            // ボーダー
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(this.x + 2, this.y + 2, this.width - 4, this.height - 4, 4);
+            ctx.stroke();
+        }
 
         ctx.restore();
     }
@@ -190,6 +280,7 @@ class Ball {
         this.penetrating = false;
         this.penetrateCount = 0;
         this.maxPenetrateCount = 10;
+        this.penetrateTimer = 0; // 貫通タイマー（フレーム数）
 
         this.explodable = false;
         this.explodeTimer = 0;
@@ -229,6 +320,14 @@ class Ball {
             if (this.explodeTimer >= this.explodeDuration) {
                 this.explodable = false;
                 this.explodeTimer = 0;
+            }
+        }
+
+        // 貫通タイマー更新
+        if (this.penetrateTimer > 0) {
+            this.penetrateTimer--;
+            if (this.penetrateTimer <= 0) {
+                this.penetrating = false;
             }
         }
     }

@@ -677,21 +677,27 @@ const Game = {
                 return;
             }
         } else {
-            // 25000以降: 10万まで5000毎、10万以降10000毎
-            const baseScore = thresholds[thresholds.length - 1];
+            // 25000以降: 10万まで10000毎、10万〜20万は25000毎、20万以降は50000毎
+            const baseScore = thresholds[thresholds.length - 1]; // 25000
             const additionalIndex = nextIndex - thresholds.length;
             let nextThreshold;
 
-            if (score < 100000) {
-                nextThreshold = baseScore + (additionalIndex + 1) * 5000;
+            // 25000〜100000: 10000毎 (75000 / 10000 = 7.5 → 8回)
+            const stepsTo100k = Math.ceil((100000 - baseScore) / 10000); // 8
+            // 100000〜200000: 25000毎 (100000 / 25000 = 4回)
+            const steps100kTo200k = 4;
+
+            if (additionalIndex < stepsTo100k) {
+                // 25000〜100000区間
+                nextThreshold = baseScore + (additionalIndex + 1) * 10000;
+            } else if (additionalIndex < stepsTo100k + steps100kTo200k) {
+                // 100000〜200000区間
+                const indexIn100k = additionalIndex - stepsTo100k;
+                nextThreshold = 100000 + (indexIn100k + 1) * 25000;
             } else {
-                const under100kSteps = Math.ceil((100000 - baseScore) / 5000);
-                const over100kIndex = additionalIndex - under100kSteps;
-                if (over100kIndex < 0) {
-                    nextThreshold = baseScore + (additionalIndex + 1) * 5000;
-                } else {
-                    nextThreshold = 100000 + (over100kIndex + 1) * 10000;
-                }
+                // 200000以降: 50000毎
+                const indexOver200k = additionalIndex - stepsTo100k - steps100kTo200k;
+                nextThreshold = 200000 + (indexOver200k + 1) * 50000;
             }
 
             if (score >= nextThreshold) {
@@ -930,10 +936,12 @@ const Game = {
 
         // 経過時間を更新
         this.roguelite.elapsedTime = Date.now() - this.roguelite.startTime;
-        const minutes = Math.floor(this.roguelite.elapsedTime / 60000);
+        const seconds = Math.floor(this.roguelite.elapsedTime / 1000);
+        const minutes = Math.floor(seconds / 60);
 
         const difficultyLevels = ['easy', 'normal', 'hard', 'extreme'];
         const previousLevel = this.roguelite.currentDifficultyLevel;
+        const previousMultiplier = this.roguelite.extremeMultiplier;
 
         if (minutes < 4) {
             // 0-3分: easy -> normal -> hard -> extreme
@@ -944,13 +952,15 @@ const Game = {
             // 4分以降: extreme固定、倍率増加
             this.roguelite.currentDifficultyLevel = 3;
             this.difficulty = 'extreme';
-            // 1分毎に0.1増加、最大2倍
-            const extraMinutes = minutes - 3;
-            this.roguelite.extremeMultiplier = Math.min(2, 1 + extraMinutes * 0.1);
+            // 5秒毎に0.1増加（8倍の頻度）、最大30倍
+            const extraSeconds = seconds - 180; // 3分以降の秒数
+            const increments = Math.floor(extraSeconds / 5); // 5秒毎に1増加
+            this.roguelite.extremeMultiplier = Math.min(30, 1 + increments * 0.1);
         }
 
         // 難易度が変わった場合、UIを更新
-        if (previousLevel !== this.roguelite.currentDifficultyLevel || minutes >= 4) {
+        if (previousLevel !== this.roguelite.currentDifficultyLevel ||
+            previousMultiplier !== this.roguelite.extremeMultiplier) {
             const label = minutes >= 4
                 ? `極み x${this.roguelite.extremeMultiplier.toFixed(1)}`
                 : difficultyLevels[minutes];
@@ -1146,14 +1156,63 @@ const Game = {
             let hp = 1;
             const rand = Math.random();
 
-            if (rand < settings.highHpRatio * 0.2) {
-                hp = 5;
-            } else if (rand < settings.highHpRatio * 0.4) {
-                hp = 4;
-            } else if (rand < settings.highHpRatio * 0.7) {
-                hp = 3;
-            } else if (rand < settings.highHpRatio) {
-                hp = 2;
+            // ローグライトモードでextremMultiplierが高い場合、HPが上昇
+            if (this.gameMode === 'roguelite' && this.roguelite.extremeMultiplier > 1) {
+                const mult = this.roguelite.extremeMultiplier;
+
+                // 黒曜石ブロック（HP20）: 5倍以降で出現、10倍で最大20%
+                if (mult >= 5) {
+                    const obsidianChance = Math.min(0.20, (mult - 5) / (10 - 5) * 0.20);
+                    if (Math.random() < obsidianChance) {
+                        hp = 20;
+                        this.blocks.push(new Block(x, y, this.blockWidth, this.blockHeight, hp));
+                        continue;
+                    }
+                }
+
+                // ダイヤモンドブロック（HP10）: 2倍以降で出現、10倍で最大20%
+                if (mult >= 2) {
+                    const diamondChance = Math.min(0.20, (mult - 2) / (10 - 2) * 0.20);
+                    if (Math.random() < diamondChance) {
+                        hp = 10;
+                        this.blocks.push(new Block(x, y, this.blockWidth, this.blockHeight, hp));
+                        continue; // 次の列のブロック生成へ（continueは内側のループに効く）
+                    }
+                }
+
+                // extremeMultiplier 1→30 で、HP5の確率が0.08→1.0に増加
+                // 30倍で全てHP5、途中では線形補間
+                const allRedThreshold = 30;
+                const redRatio = Math.min(1, (mult - 1) / (allRedThreshold - 1));
+
+                // 基本的な確率分布をシフト
+                // redRatioが1に近づくほど、全てHP5に
+                if (rand < redRatio) {
+                    hp = 5;
+                } else {
+                    // 通常の確率分布を残りの範囲で適用
+                    const adjustedRand = (rand - redRatio) / (1 - redRatio);
+                    if (adjustedRand < settings.highHpRatio * 0.2) {
+                        hp = 5;
+                    } else if (adjustedRand < settings.highHpRatio * 0.4) {
+                        hp = 4;
+                    } else if (adjustedRand < settings.highHpRatio * 0.7) {
+                        hp = 3;
+                    } else if (adjustedRand < settings.highHpRatio) {
+                        hp = 2;
+                    }
+                }
+            } else {
+                // 通常モードまたはローグライト初期
+                if (rand < settings.highHpRatio * 0.2) {
+                    hp = 5;
+                } else if (rand < settings.highHpRatio * 0.4) {
+                    hp = 4;
+                } else if (rand < settings.highHpRatio * 0.7) {
+                    hp = 3;
+                } else if (rand < settings.highHpRatio) {
+                    hp = 2;
+                }
             }
 
             this.blocks.push(new Block(x, y, this.blockWidth, this.blockHeight, hp));
@@ -1400,7 +1459,7 @@ const Game = {
     checkBallBlockCollisions(ball) {
         for (let i = this.blocks.length - 1; i >= 0; i--) {
             const block = this.blocks[i];
-            if (block.destroyed) continue;
+            if (!block || block.destroyed) continue;
 
             const bounds = block.getBounds();
 
@@ -1527,7 +1586,7 @@ const Game = {
 
         for (let i = this.blocks.length - 1; i >= 0; i--) {
             const block = this.blocks[i];
-            if (block.destroyed) continue;
+            if (!block || block.destroyed) continue;
 
             block.y += settings.blockSpeed;
 
@@ -1706,7 +1765,7 @@ const Game = {
         // ブロックが画面下に到達したらダメージ（即ゲームオーバーではない）
         for (let i = this.blocks.length - 1; i >= 0; i--) {
             const block = this.blocks[i];
-            if (block.destroyed) continue;
+            if (!block || block.destroyed) continue;
 
             // 画面下に到達
             if (block.y + block.height >= this.canvas.height) {
@@ -1841,7 +1900,7 @@ const Game = {
 
         // ブロック
         for (const block of this.blocks) {
-            block.draw(this.ctx);
+            if (block) block.draw(this.ctx);
         }
 
         // オーブ
@@ -2070,6 +2129,7 @@ const Game = {
                 ball.penetrating = true;
                 ball.penetrateCount = 0;
                 ball.maxPenetrateCount = penetrateCount;
+                ball.penetrateTimer = 300; // 5秒制限
             });
         }
     },
@@ -2090,6 +2150,7 @@ const Game = {
                 ball.penetrating = true;
                 ball.penetrateCount = 0;
                 ball.maxPenetrateCount = penetrateCount;
+                ball.penetrateTimer = 300; // 5秒制限
             });
         }
     },
