@@ -6,13 +6,16 @@ const UI = {
 
     screens: {
         start: document.getElementById('start-screen'),
+        difficulty: document.getElementById('difficulty-screen'),
         skillSelect: document.getElementById('skill-select-screen'),
         game: document.getElementById('game-screen')
     },
     overlays: {
         pause: document.getElementById('pause-overlay'),
         gameover: document.getElementById('gameover-overlay'),
-        help: document.getElementById('help-overlay')
+        help: document.getElementById('help-overlay'),
+        ability: document.getElementById('ability-overlay'),
+        skillSwap: document.getElementById('skill-swap-overlay')
     },
     elements: {
         hpFill: document.getElementById('hp-fill'),
@@ -23,7 +26,9 @@ const UI = {
         skillBar: document.getElementById('skill-bar'),
         skillList: document.getElementById('skills-list'),
         selectedSlots: document.querySelectorAll('.selected-skill-slot'),
-        gameStartBtn: document.getElementById('game-start-btn')
+        gameStartBtn: document.getElementById('game-start-btn'),
+        abilityChoices: document.getElementById('ability-choices'),
+        skillSwapChoices: document.getElementById('skill-swap-choices')
     },
     buttons: {
         difficulties: document.querySelectorAll('.btn-difficulty'),
@@ -39,7 +44,11 @@ const UI = {
         restartSkill: document.getElementById('restart-skill-btn'),
         startHelp: document.getElementById('start-help-btn'),
         pauseHelp: document.getElementById('pause-help-btn'),
-        helpBack: document.getElementById('help-back-btn')
+        helpBack: document.getElementById('help-back-btn'),
+        modeNormal: document.getElementById('mode-normal-btn'),
+        modeRoguelite: document.getElementById('mode-roguelite-btn'),
+        backToMode: document.getElementById('back-to-mode-btn'),
+        skillSwapCancel: document.getElementById('skill-swap-cancel-btn')
     },
 
     // コールバック保持
@@ -543,5 +552,166 @@ const UI = {
                 this.hideOverlay('help');
             });
         }
+
+        // モード選択: 通常モード
+        if (this.buttons.modeNormal) {
+            this.buttons.modeNormal.addEventListener('click', () => {
+                if (callbacks.onModeNormal) callbacks.onModeNormal();
+            });
+        }
+
+        // モード選択: ローグライト
+        if (this.buttons.modeRoguelite) {
+            this.buttons.modeRoguelite.addEventListener('click', () => {
+                if (callbacks.onModeRoguelite) callbacks.onModeRoguelite();
+            });
+        }
+
+        // 難易度選択画面の戻る
+        if (this.buttons.backToMode) {
+            this.buttons.backToMode.addEventListener('click', () => {
+                this.showScreen('start');
+            });
+        }
+
+        // スキル入れ替えキャンセル
+        if (this.buttons.skillSwapCancel) {
+            this.buttons.skillSwapCancel.addEventListener('click', () => {
+                this.hideOverlay('skillSwap');
+                if (callbacks.onSkillSwapCancel) callbacks.onSkillSwapCancel();
+            });
+        }
+    },
+
+    /**
+     * 能力選択UIを表示
+     */
+    showAbilitySelection(choices, onSelect, onSkip, onReroll, canReroll) {
+        const container = this.elements.abilityChoices;
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        choices.forEach((choice, index) => {
+            const card = document.createElement('div');
+            card.className = 'ability-card';
+
+            // スキルかどうか判定
+            const isSkill = choice.isSkill;
+            if (isSkill) {
+                card.classList.add('ability-card-skill');
+            }
+
+            const icon = document.createElement('div');
+            icon.className = 'ability-card-icon';
+            icon.textContent = choice.icon || '?';
+
+            const info = document.createElement('div');
+            info.className = 'ability-card-info';
+
+            const name = document.createElement('div');
+            name.className = 'ability-card-name';
+            name.textContent = choice.name;
+
+            const level = document.createElement('div');
+            level.className = 'ability-card-level';
+            if (choice.currentLevel !== undefined && choice.maxLevel) {
+                level.textContent = `Lv.${choice.currentLevel} → ${choice.currentLevel + 1}/${choice.maxLevel}`;
+            } else if (choice.isInstant) {
+                level.textContent = '即時効果';
+            }
+
+            const desc = document.createElement('div');
+            desc.className = 'ability-card-desc';
+            desc.textContent = choice.description || '';
+
+            info.appendChild(name);
+            info.appendChild(level);
+            info.appendChild(desc);
+            card.appendChild(icon);
+            card.appendChild(info);
+
+            card.addEventListener('click', () => {
+                if (onSelect) onSelect(choice, index);
+            });
+
+            container.appendChild(card);
+        });
+
+        // アクションボタンコンテナを作成
+        const actionContainer = document.createElement('div');
+        actionContainer.className = 'ability-actions';
+
+        // スキップボタン
+        const skipBtn = document.createElement('button');
+        skipBtn.className = 'btn ability-btn ability-btn-skip';
+        skipBtn.innerHTML = '<span class="btn-text">何もしない</span>';
+        skipBtn.addEventListener('click', () => {
+            if (onSkip) onSkip();
+        });
+        actionContainer.appendChild(skipBtn);
+
+        // 再抽選ボタン
+        const rerollBtn = document.createElement('button');
+        rerollBtn.className = 'btn ability-btn ability-btn-reroll';
+        rerollBtn.innerHTML = '<span class="btn-text">再抽選 (HP-5)</span>';
+        rerollBtn.disabled = !canReroll;
+        rerollBtn.addEventListener('click', () => {
+            if (onReroll && canReroll) onReroll();
+        });
+        actionContainer.appendChild(rerollBtn);
+
+        container.appendChild(actionContainer);
+
+        this.showOverlay('ability');
+    },
+
+    /**
+     * 能力選択UIを非表示
+     */
+    hideAbilitySelection() {
+        this.hideOverlay('ability');
+    },
+
+    /**
+     * スキル入れ替えUIを表示
+     */
+    showSkillSwapSelection(currentSkills, newSkill, onSelect) {
+        const container = this.elements.skillSwapChoices;
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        currentSkills.forEach((skill, index) => {
+            const card = document.createElement('div');
+            card.className = 'skill-swap-card';
+
+            const icon = document.createElement('div');
+            icon.className = 'skill-swap-icon';
+            icon.textContent = skill.icon || '?';
+
+            const name = document.createElement('div');
+            name.className = 'skill-swap-name';
+            name.textContent = `${skill.name} Lv.${skill.level}`;
+
+            card.appendChild(icon);
+            card.appendChild(name);
+
+            card.addEventListener('click', () => {
+                if (onSelect) onSelect(index);
+            });
+
+            container.appendChild(card);
+        });
+
+        this.showOverlay('skillSwap');
+    },
+
+    /**
+     * スキル入れ替えUIを非表示
+     */
+    hideSkillSwapSelection() {
+        this.hideOverlay('skillSwap');
     },
 };
+

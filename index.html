@@ -22,7 +22,28 @@
                 <p class="game-subtitle">ブロック崩し</p>
             </div>
             <div class="menu-container">
-                <p class="select-label">難易度を選択</p>
+                <p class="select-label">モードを選択</p>
+                <button class="btn btn-mode" id="mode-normal-btn">
+                    <span class="btn-text">通常モード</span>
+                    <span class="btn-desc">難易度を選んでプレイ</span>
+                </button>
+                <button class="btn btn-mode btn-roguelite" id="mode-roguelite-btn">
+                    <span class="btn-text">ローグライト</span>
+                    <span class="btn-desc">能力を獲得しながら進む</span>
+                </button>
+                <button class="btn btn-help" id="start-help-btn">
+                    <span class="btn-text">操作方法について</span>
+                </button>
+                <button class="btn btn-exit" id="exit-btn">
+                    <span class="btn-text">ゲーム終了</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 難易度選択画面 -->
+        <div id="difficulty-screen" class="screen">
+            <h2 class="screen-title">難易度を選択</h2>
+            <div class="menu-container">
                 <button class="btn btn-difficulty" data-difficulty="easy">
                     <span class="btn-text">簡単</span>
                     <span class="btn-desc">初心者向け</span>
@@ -39,14 +60,12 @@
                     <span class="btn-text">極み</span>
                     <span class="btn-desc">究極の挑戦</span>
                 </button>
-                <button class="btn btn-help" id="start-help-btn">
-                    <span class="btn-text">操作方法について</span>
-                </button>
-                <button class="btn btn-exit" id="exit-btn">
-                    <span class="btn-text">ゲーム終了</span>
+                <button class="btn btn-back" id="back-to-mode-btn">
+                    <span class="btn-text">戻る</span>
                 </button>
             </div>
         </div>
+
 
         <!-- スキル選択画面 -->
         <div id="skill-select-screen" class="screen">
@@ -197,6 +216,31 @@
                 </div>
                 <button class="btn btn-back" id="help-back-btn" style="margin-top: 20px;">
                     <span class="btn-text">閉じる</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 能力選択オーバーレイ（ローグライト用） -->
+        <div id="ability-overlay" class="overlay">
+            <div class="overlay-content ability-content">
+                <h2 class="overlay-title ability-title">能力を獲得!</h2>
+                <p class="ability-subtitle">1つ選んでください</p>
+                <div id="ability-choices" class="ability-grid">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- スキル入れ替えオーバーレイ（ローグライト用） -->
+        <div id="skill-swap-overlay" class="overlay">
+            <div class="overlay-content">
+                <h2 class="overlay-title">スキル入れ替え</h2>
+                <p class="skill-swap-subtitle">入れ替えるスキルを選択</p>
+                <div id="skill-swap-choices" class="skill-swap-grid">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+                <button class="btn btn-back" id="skill-swap-cancel-btn">
+                    <span class="btn-text">キャンセル</span>
                 </button>
             </div>
         </div>

@@ -360,6 +360,9 @@ body {
     backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 10;
+    box-sizing: border-box;
+    overflow: visible;
+    position: relative;
 }
 
 .hud-left,
@@ -367,6 +370,7 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    flex-shrink: 0;
 }
 
 .hud-item {
@@ -394,6 +398,8 @@ body {
 
 .orb-value {
     color: var(--orb-color);
+    white-space: nowrap;
+    min-width: auto;
 }
 
 .hp-bar {
@@ -417,13 +423,16 @@ body {
 
 .difficulty-badge {
     font-family: 'Orbitron', sans-serif;
-    font-size: 0.9rem;
-    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: 0.8rem;
+    padding: 2px 8px;
     border-radius: 20px;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     white-space: nowrap;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .btn-pause {
@@ -833,6 +842,217 @@ body {
 }
 
 /* ========================================
+   モードボタン
+======================================== */
+.btn-mode {
+    background: linear-gradient(135deg, rgba(0, 150, 200, 0.3), rgba(0, 100, 150, 0.3));
+    border: 1px solid rgba(0, 200, 255, 0.3);
+}
+
+.btn-mode:hover {
+    background: linear-gradient(135deg, rgba(0, 200, 255, 0.4), rgba(0, 150, 200, 0.4));
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+.btn-roguelite {
+    background: linear-gradient(135deg, rgba(150, 50, 200, 0.3), rgba(100, 0, 150, 0.3));
+    border: 1px solid rgba(200, 100, 255, 0.3);
+}
+
+.btn-roguelite:hover {
+    background: linear-gradient(135deg, rgba(200, 100, 255, 0.4), rgba(150, 50, 200, 0.4));
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+}
+
+/* ========================================
+   能力選択オーバーレイ
+======================================== */
+.ability-content {
+    max-width: 400px;
+    width: 90%;
+}
+
+.ability-title {
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: var(--spacing-xs);
+}
+
+.ability-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: var(--spacing-lg);
+}
+
+.ability-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.ability-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ability-card:hover {
+    background: rgba(0, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+    transform: translateX(5px);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+.ability-card-skill {
+    border-color: rgba(255, 0, 255, 0.3);
+}
+
+.ability-card-skill:hover {
+    background: rgba(255, 0, 255, 0.1);
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 15px rgba(255, 0, 255, 0.2);
+}
+
+.ability-card-icon {
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--border-radius);
+    flex-shrink: 0;
+}
+
+.ability-card-info {
+    flex: 1;
+    text-align: left;
+}
+
+.ability-card-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.ability-card-level {
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    margin-bottom: 4px;
+}
+
+.ability-card-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+/* 能力選択アクションボタン */
+.ability-actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ability-btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    min-width: 120px;
+    font-size: 0.85rem;
+}
+
+.ability-btn-skip {
+    background: rgba(100, 100, 120, 0.3);
+    border: 1px solid rgba(150, 150, 170, 0.4);
+}
+
+.ability-btn-skip:hover {
+    background: rgba(120, 120, 140, 0.4);
+    border-color: rgba(180, 180, 200, 0.5);
+}
+
+.ability-btn-reroll {
+    background: linear-gradient(135deg, rgba(255, 100, 100, 0.3) 0%, rgba(255, 50, 50, 0.2) 100%);
+    border: 1px solid rgba(255, 100, 100, 0.4);
+}
+
+.ability-btn-reroll:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(255, 120, 120, 0.4) 0%, rgba(255, 70, 70, 0.3) 100%);
+    border-color: rgba(255, 120, 120, 0.6);
+    box-shadow: 0 0 10px rgba(255, 100, 100, 0.3);
+}
+
+.ability-btn-reroll:disabled {
+    background: rgba(80, 80, 80, 0.2);
+    border-color: rgba(100, 100, 100, 0.2);
+    color: rgba(150, 150, 150, 0.5);
+    cursor: not-allowed;
+}
+
+/* ========================================
+   スキル入れ替えオーバーレイ
+======================================== */
+.skill-swap-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: var(--spacing-lg);
+}
+
+.skill-swap-grid {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-lg);
+}
+
+.skill-swap-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 0, 255, 0.3);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 80px;
+}
+
+.skill-swap-card:hover {
+    background: rgba(255, 0, 255, 0.15);
+    border-color: var(--accent-secondary);
+    transform: translateY(-3px);
+    box-shadow: 0 0 15px rgba(255, 0, 255, 0.3);
+}
+
+.skill-swap-icon {
+    font-size: 1.5rem;
+}
+
+.skill-swap-name {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    text-align: center;
+}
+
+/* ========================================
    レスポンシブ
 ======================================== */
 @media (max-width: 768px) {
@@ -864,5 +1084,231 @@ body {
 
     .skill-btn {
         width: 80px;
+    }
+}
+
+/* 小さなスマホ向け (高さが短い画面) */
+@media (max-height: 700px) {
+
+    /* スタート画面: スクロール可能に */
+    #start-screen {
+        justify-content: flex-start;
+        padding-top: var(--spacing-md);
+        overflow-y: auto;
+    }
+
+    .title-container {
+        flex-shrink: 0;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .game-title {
+        font-size: clamp(1.8rem, 6vw, 3rem);
+    }
+
+    .game-subtitle {
+        font-size: clamp(0.8rem, 2.5vw, 1rem);
+    }
+
+    .menu-container {
+        gap: var(--spacing-sm);
+        width: 100%;
+        align-items: center;
+        padding-bottom: var(--spacing-lg);
+    }
+
+    .btn {
+        min-width: 220px;
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .btn-text {
+        font-size: 0.9rem;
+    }
+
+    .btn-desc {
+        font-size: 0.65rem;
+    }
+
+    .select-label {
+        font-size: 0.8rem;
+        margin-bottom: var(--spacing-xs);
+    }
+}
+
+/* より小さなスマホ向け (高さ600px以下) */
+@media (max-height: 600px) {
+    #start-screen {
+        padding-top: var(--spacing-sm);
+    }
+
+    .game-title {
+        font-size: clamp(1.5rem, 5vw, 2.5rem);
+    }
+
+    .menu-container {
+        gap: 6px;
+    }
+
+    .btn {
+        min-width: 200px;
+        padding: 8px 16px;
+    }
+
+    .btn-text {
+        font-size: 0.85rem;
+    }
+
+    /* ゲームHUD調整 */
+    #game-hud {
+        padding: 4px 8px;
+        flex-wrap: wrap;
+        min-height: auto;
+    }
+
+    .hud-label {
+        font-size: 0.7rem;
+    }
+
+    .hud-value {
+        font-size: 0.85rem;
+        min-width: 40px;
+    }
+
+    .hp-bar {
+        width: 60px;
+        height: 12px;
+    }
+
+    .difficulty-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+    }
+
+    .hud-left,
+    .hud-right {
+        gap: var(--spacing-xs);
+    }
+
+    .hud-item {
+        gap: 2px;
+    }
+
+    /* スキルバーも縮小 */
+    .skill-btn {
+        width: 70px;
+        padding: 6px;
+    }
+
+    .skill-btn-icon {
+        font-size: 1rem;
+    }
+
+    .skill-btn .skill-btn-name {
+        font-size: 0.65rem;
+    }
+}
+
+/* 極小画面向け (高さ500px以下) */
+@media (max-height: 500px) {
+    .game-title {
+        font-size: 1.2rem;
+    }
+
+    .game-subtitle {
+        font-size: 0.7rem;
+        margin-top: 2px;
+    }
+
+    .title-container {
+        margin-bottom: var(--spacing-sm);
+    }
+
+    .btn {
+        min-width: 180px;
+        padding: 6px 12px;
+    }
+
+    .btn-text {
+        font-size: 0.75rem;
+    }
+
+    .btn-desc {
+        display: none;
+    }
+
+    #game-hud {
+        padding: 2px 6px;
+    }
+
+    .hud-label {
+        font-size: 0.6rem;
+    }
+
+    .hud-value {
+        font-size: 0.75rem;
+        min-width: 30px;
+    }
+
+    .hp-bar {
+        width: 50px;
+        height: 10px;
+    }
+
+    .difficulty-badge {
+        display: none;
+    }
+}
+
+/* 幅が中程度に狭い画面向け (スマホ横幅) */
+@media (max-width: 450px) {
+    .difficulty-badge {
+        display: none;
+    }
+
+    .hud-center {
+        display: none;
+    }
+
+    #game-hud {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .hud-label {
+        font-size: 0.75rem;
+    }
+
+    .hud-value {
+        font-size: 0.9rem;
+        min-width: 50px;
+    }
+}
+
+/* 幅が狭い画面向け */
+@media (max-width: 360px) {
+    #game-hud {
+        padding: 4px 6px;
+    }
+
+    .hud-left,
+    .hud-right {
+        gap: 4px;
+    }
+
+    .hud-label {
+        font-size: 0.65rem;
+    }
+
+    .hud-value {
+        font-size: 0.8rem;
+        min-width: 35px;
+    }
+
+    .hp-bar {
+        width: 50px;
+    }
+
+    .btn {
+        min-width: 90%;
     }
 }

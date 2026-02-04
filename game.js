@@ -61,6 +61,110 @@ const Game = {
         orbs: 0
     },
 
+    // ゲームモード: 'normal' または 'roguelite'
+    gameMode: 'normal',
+
+    // ローグライト専用プロパティ
+    roguelite: {
+        elapsedTime: 0,           // 経過時間(ms)
+        startTime: 0,             // 開始時刻
+        currentDifficultyLevel: 0, // 0=easy, 1=normal, 2=hard, 3=extreme
+        extremeMultiplier: 1,     // 極み以降の強化倍率
+        abilities: {},            // 獲得済み能力 { abilityId: level }
+        skills: [],               // 獲得済みスキル [{ id, level, icon, name }] 最大3つ
+        nextAbilityIndex: 0,      // 次の能力獲得インデックス
+        abilityThresholds: [2000, 4000, 6000, 8000, 10000, 14000, 18000, 25000],
+        isSelectingAbility: false, // 能力選択中フラグ
+        pendingSkill: null,       // 入れ替え待ちのスキル
+        currentChoices: null,     // 現在の選択肢（保持用）
+    },
+
+    // 能力定義（ローグライト用）
+    allAbilities: [
+        {
+            id: 'orbAbsorb',
+            name: 'オーブ吸収',
+            icon: '🧲',
+            maxLevel: 5,
+            description: 'バーがオーブを吸引する',
+            getLevelEffect: (level) => [3, 3.5, 4, 4.5, 6][level - 1]
+        },
+        {
+            id: 'heal1',
+            name: '回復(小)',
+            icon: '💚',
+            maxLevel: 1,
+            isInstant: true,
+            healAmount: 3,
+            description: 'HPを3回復'
+        },
+        {
+            id: 'heal2',
+            name: '回復(中)',
+            icon: '💚',
+            maxLevel: 1,
+            isInstant: true,
+            healAmount: 4,
+            description: 'HPを4回復'
+        },
+        {
+            id: 'heal3',
+            name: '回復(大)',
+            icon: '💚',
+            maxLevel: 1,
+            isInstant: true,
+            healAmount: 5,
+            description: 'HPを5回復'
+        },
+        {
+            id: 'barWidth',
+            name: 'バー幅強化',
+            icon: '📏',
+            maxLevel: 5,
+            description: 'バーの幅を拡大',
+            getLevelEffect: (level) => [1.2, 1.4, 1.6, 1.8, 2.0][level - 1]
+        },
+        {
+            id: 'orbLimit',
+            name: 'オーブ上限増加',
+            icon: '💎',
+            maxLevel: 5,
+            description: 'オーブの最大所持数を増加',
+            getLevelEffect: (level) => [250, 300, 350, 400, 500][level - 1]
+        },
+        {
+            id: 'orbDropRate',
+            name: 'オーブ出現強化',
+            icon: '✨',
+            maxLevel: 5,
+            description: 'オーブのドロップ率を上昇',
+            getLevelEffect: (level) => [0.05, 0.10, 0.15, 0.20, 0.25][level - 1]
+        },
+        {
+            id: 'ballDamage',
+            name: 'ボール強化',
+            icon: '⚪',
+            maxLevel: 3,
+            description: 'ボールの攻撃力を増加',
+            getLevelEffect: (level) => [2, 3, 4][level - 1]
+        }
+    ],
+
+    // スキルレベル効果（ローグライト用）
+    skillLevelEffects: {
+        penetrate: { maxLevel: 5, getEffect: (lv) => [3, 5, 10, 15, 20][lv - 1] },
+        vPenetrate: { maxLevel: 5, getEffect: (lv) => [3, 5, 10, 15, 20][lv - 1] },
+        hPenetrate: { maxLevel: 5, getEffect: (lv) => [3, 5, 10, 15, 20][lv - 1] },
+        // 爆破: radius=ブロック数、count=爆発回数
+        explode: { maxLevel: 5, getEffect: (lv) => ({ radius: [3, 4, 5, 6, 6][lv - 1], count: lv >= 5 ? 2 : 1 }) },
+        gravity: { maxLevel: 5, getEffect: (lv) => ({ radius: [5, 7, 9, 11, 13][lv - 1], power: [1, 1.2, 1.4, 1.6, 1.8][lv - 1], extraDuration: lv >= 4 ? 5000 : 0 }) },
+        barExplode: { maxLevel: 5, getEffect: (lv) => [3, 4, 5, 6, 7][lv - 1] },
+        // ビーム: damage=ダメージ、widthMult=バー幅に対する倍率
+        beam: { maxLevel: 5, getEffect: (lv) => ({ damage: [2, 3, 4, 4, 4][lv - 1], widthMult: [1, 1, 1, 1.1, 1.3][lv - 1] }) },
+        clone: { maxLevel: 5, getEffect: (lv) => [1, 2, 5, 7, 10][lv - 1] },
+        barInvincible: { maxLevel: 5, getEffect: (lv) => ({ duration: [3, 4, 5, 5, 5][lv - 1], widthMult: [1, 1, 1, 1.5, 2][lv - 1] }) }
+    },
+
     // スキルコスト・パラメータ
     // スキル選択状態
     selectedSkills: [], // 選択された3つのスキルID
@@ -355,15 +459,47 @@ const Game = {
             onSkillExplode: () => this.activateExplodeSkill(),
             onSkillCancel: () => this.cancelSkill(),
             onRestartSkill: () => this.returnToSkillSelect(),
-            onShowHelp: () => UI.renderHelpSkills(this.allSkills)
+            onShowHelp: () => UI.renderHelpSkills(this.allSkills),
+            // ローグライト用
+            onModeNormal: () => this.selectNormalMode(),
+            onModeRoguelite: () => this.selectRogueliteMode(),
+            onSkillSwapCancel: () => this.cancelSkillSwap()
         });
+    },
+
+    /**
+     * 通常モードを選択
+     */
+    selectNormalMode() {
+        this.gameMode = 'normal';
+        UI.showScreen('difficulty');
+    },
+
+    /**
+     * ローグライトモードを選択
+     */
+    selectRogueliteMode() {
+        this.gameMode = 'roguelite';
+        this.startRogueliteGame();
+    },
+
+    /**
+     * スキル入れ替えをキャンセル
+     */
+    cancelSkillSwap() {
+        this.roguelite.pendingSkill = null;
+        UI.hideSkillSwapSelection();
+        // 能力選択に戻る
+        if (this.roguelite.isSelectingAbility) {
+            this.showAbilitySelection();
+        }
     },
 
     /**
      * 難易度選択に戻る
      */
     returnToDifficultySelect() {
-        UI.showScreen('start');
+        UI.showScreen('difficulty');
         this.selectedSkills = [];
     },
 
@@ -455,11 +591,430 @@ const Game = {
         this.paused = false;
         this.gameOver = false;
 
-        // 少し遅延して新しいループを開始（前のループが確実に終了するのを待つ）
         setTimeout(() => {
             this.running = true;
             this.gameLoop();
         }, 50);
+    },
+
+    /**
+     * ローグライトモードでゲームを開始
+     */
+    startRogueliteGame() {
+        // 既存のゲームループを停止
+        this.running = false;
+
+        // ローグライト初期化
+        this.difficulty = 'easy'; // 初期難易度
+        this.roguelite = {
+            elapsedTime: 0,
+            startTime: Date.now(),
+            currentDifficultyLevel: 0,
+            extremeMultiplier: 1,
+            abilities: {},
+            skills: [],
+            nextAbilityIndex: 0,
+            abilityThresholds: [2000, 4000, 6000, 8000, 10000, 14000, 18000, 25000],
+            isSelectingAbility: false,
+            pendingSkill: null,
+            currentChoices: null,
+        };
+
+        this.selectedSkills = []; // スキルなしで開始
+        this.resetGameState();
+
+        UI.showScreen('game');
+        UI.hideAllOverlays();
+        UI.updateDifficultyBadge('ローグライト');
+        UI.renderSkillBar(this.allSkills, this.selectedSkills); // 空のスキルバー
+
+        this.resizeCanvas();
+        this.createInitialBlocks();
+        this.createPaddle();
+        this.resetBall();
+
+        this.paused = false;
+        this.gameOver = false;
+
+        setTimeout(() => {
+            this.running = true;
+            this.gameLoop();
+        }, 50);
+    },
+
+    /**
+     * ローグライト: 能力獲得チェック
+     */
+    checkAbilityUnlock() {
+        if (this.gameMode !== 'roguelite') return;
+        if (this.roguelite.isSelectingAbility) return;
+
+        const score = this.player.score;
+        const thresholds = this.roguelite.abilityThresholds;
+        const nextIndex = this.roguelite.nextAbilityIndex;
+
+        // 固定閾値のチェック
+        if (nextIndex < thresholds.length) {
+            if (score >= thresholds[nextIndex]) {
+                this.showAbilitySelection();
+                return;
+            }
+        } else {
+            // 25000以降: 10万まで5000毎、10万以降10000毎
+            const baseScore = thresholds[thresholds.length - 1];
+            const additionalIndex = nextIndex - thresholds.length;
+            let nextThreshold;
+
+            if (score < 100000) {
+                nextThreshold = baseScore + (additionalIndex + 1) * 5000;
+            } else {
+                const under100kSteps = Math.ceil((100000 - baseScore) / 5000);
+                const over100kIndex = additionalIndex - under100kSteps;
+                if (over100kIndex < 0) {
+                    nextThreshold = baseScore + (additionalIndex + 1) * 5000;
+                } else {
+                    nextThreshold = 100000 + (over100kIndex + 1) * 10000;
+                }
+            }
+
+            if (score >= nextThreshold) {
+                this.showAbilitySelection();
+                return;
+            }
+        }
+    },
+
+    /**
+     * ローグライト: 能力選択画面を表示
+     */
+    showAbilitySelection() {
+        this.roguelite.isSelectingAbility = true;
+        this.pauseGameForAbility();
+
+        // 保持された選択肢がない場合のみ新規生成
+        if (!this.roguelite.currentChoices) {
+            this.roguelite.currentChoices = this.generateAbilityChoices();
+        }
+
+        const choices = this.roguelite.currentChoices;
+        const canReroll = this.player.hp > 5;
+
+        UI.showAbilitySelection(
+            choices,
+            (choice, index) => {
+                this.selectAbility(choice);
+            },
+            () => {
+                // スキップ
+                this.skipAbilitySelection();
+            },
+            () => {
+                // 再抽選（HP5消費）
+                this.rerollAbilitySelection();
+            },
+            canReroll
+        );
+    },
+
+    /**
+     * ローグライト: 能力選択用にゲームを一時停止
+     */
+    pauseGameForAbility() {
+        this.paused = true;
+    },
+
+    /**
+     * ローグライト: 3つの選択肢を生成
+     */
+    generateAbilityChoices() {
+        const choices = [];
+        const availableAbilities = [];
+        const availableSkills = [];
+
+        // 能力候補
+        this.allAbilities.forEach(ability => {
+            const currentLevel = this.roguelite.abilities[ability.id] || 0;
+            if (currentLevel < ability.maxLevel) {
+                availableAbilities.push({
+                    ...ability,
+                    currentLevel,
+                    isSkill: false
+                });
+            }
+        });
+
+        // スキル候補（レベル上限未満のもの）
+        this.allSkills.forEach(skill => {
+            const existingSkill = this.roguelite.skills.find(s => s.id === skill.id);
+            const currentLevel = existingSkill ? existingSkill.level : 0;
+            const levelEffects = this.skillLevelEffects[skill.id];
+            const maxLevel = levelEffects ? levelEffects.maxLevel : 1;
+
+            if (currentLevel < maxLevel) {
+                availableSkills.push({
+                    ...skill,
+                    currentLevel,
+                    maxLevel,
+                    isSkill: true
+                });
+            }
+        });
+
+        // 全候補を統合してシャッフル
+        const allChoices = [...availableAbilities, ...availableSkills];
+        this.shuffleArray(allChoices);
+
+        // 3つ選択（足りなければ少なく）
+        for (let i = 0; i < Math.min(3, allChoices.length); i++) {
+            choices.push(allChoices[i]);
+        }
+
+        return choices;
+    },
+
+    /**
+     * 配列をシャッフル
+     */
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    },
+
+    /**
+     * ローグライト: 能力を選択
+     */
+    selectAbility(choice) {
+        if (choice.isSkill) {
+            this.acquireRogueliteSkill(choice);
+        } else {
+            this.applyAbility(choice);
+        }
+    },
+
+    /**
+     * ローグライト: 能力を適用
+     */
+    applyAbility(ability) {
+        const currentLevel = this.roguelite.abilities[ability.id] || 0;
+        const newLevel = currentLevel + 1;
+        this.roguelite.abilities[ability.id] = newLevel;
+
+        // 即時効果の場合
+        if (ability.isInstant && ability.healAmount) {
+            this.player.hp = Math.min(this.player.hp + ability.healAmount, this.player.maxHp);
+            UI.updateHP(this.player.hp, this.player.maxHp);
+        }
+
+        // オーブ上限増加の場合
+        if (ability.id === 'orbLimit' && ability.getLevelEffect) {
+            // maxOrbsを更新
+            this.difficultySettings[this.difficulty].maxOrbs = ability.getLevelEffect(newLevel);
+        }
+
+        this.finishAbilitySelection();
+    },
+
+    /**
+     * ローグライト: スキルを獲得
+     */
+    acquireRogueliteSkill(skill) {
+        const existingIndex = this.roguelite.skills.findIndex(s => s.id === skill.id);
+
+        if (existingIndex >= 0) {
+            // 既存スキルのレベルアップ
+            this.roguelite.skills[existingIndex].level++;
+            this.updateSelectedSkillsFromRoguelite();
+            this.finishAbilitySelection();
+        } else if (this.roguelite.skills.length < 3) {
+            // 新規スキル追加（3つ未満）
+            this.roguelite.skills.push({
+                id: skill.id,
+                level: 1,
+                icon: skill.icon,
+                name: skill.name
+            });
+            this.updateSelectedSkillsFromRoguelite();
+            this.finishAbilitySelection();
+        } else {
+            // スキル入れ替えが必要
+            this.roguelite.pendingSkill = skill;
+            UI.hideAbilitySelection();
+            UI.showSkillSwapSelection(this.roguelite.skills, skill, (index) => {
+                this.swapSkill(index, skill);
+            });
+        }
+    },
+
+    /**
+     * ローグライト: スキルを入れ替え
+     */
+    swapSkill(index, newSkill) {
+        this.roguelite.skills[index] = {
+            id: newSkill.id,
+            level: 1,
+            icon: newSkill.icon,
+            name: newSkill.name
+        };
+        this.roguelite.pendingSkill = null;
+        UI.hideSkillSwapSelection();
+        this.updateSelectedSkillsFromRoguelite();
+        this.finishAbilitySelection();
+    },
+
+    /**
+     * ローグライト: selectedSkillsを更新
+     */
+    updateSelectedSkillsFromRoguelite() {
+        this.selectedSkills = this.roguelite.skills.map(s => s.id);
+        UI.renderSkillBar(this.allSkills, this.selectedSkills);
+    },
+
+    /**
+     * ローグライト: 能力選択完了
+     */
+    finishAbilitySelection() {
+        this.roguelite.isSelectingAbility = false;
+        this.roguelite.nextAbilityIndex++;
+        this.roguelite.currentChoices = null; // 選択肢をクリア
+        UI.hideAbilitySelection();
+        this.paused = false;
+    },
+
+    /**
+     * ローグライト: 能力選択をスキップ
+     */
+    skipAbilitySelection() {
+        this.finishAbilitySelection();
+    },
+
+    /**
+     * ローグライト: 能力を再抽選（HP5消費）
+     */
+    rerollAbilitySelection() {
+        if (this.player.hp > 5) {
+            this.player.hp -= 5;
+            UI.updateHP(this.player.hp, this.player.maxHp);
+            this.roguelite.currentChoices = null; // 現在の選択肢をクリア
+            UI.hideAbilitySelection();
+            // 少し遅延して新しい選択肢を表示
+            setTimeout(() => {
+                this.showAbilitySelection();
+            }, 100);
+        }
+    },
+
+    /**
+     * ローグライト: 難易度を時間経過で更新
+     */
+    updateRogueliteDifficulty() {
+        if (this.gameMode !== 'roguelite') return;
+
+        // 経過時間を更新
+        this.roguelite.elapsedTime = Date.now() - this.roguelite.startTime;
+        const minutes = Math.floor(this.roguelite.elapsedTime / 60000);
+
+        const difficultyLevels = ['easy', 'normal', 'hard', 'extreme'];
+        const previousLevel = this.roguelite.currentDifficultyLevel;
+
+        if (minutes < 4) {
+            // 0-3分: easy -> normal -> hard -> extreme
+            this.roguelite.currentDifficultyLevel = minutes;
+            this.difficulty = difficultyLevels[minutes];
+            this.roguelite.extremeMultiplier = 1;
+        } else {
+            // 4分以降: extreme固定、倍率増加
+            this.roguelite.currentDifficultyLevel = 3;
+            this.difficulty = 'extreme';
+            // 1分毎に0.1増加、最大2倍
+            const extraMinutes = minutes - 3;
+            this.roguelite.extremeMultiplier = Math.min(2, 1 + extraMinutes * 0.1);
+        }
+
+        // 難易度が変わった場合、UIを更新
+        if (previousLevel !== this.roguelite.currentDifficultyLevel || minutes >= 4) {
+            const label = minutes >= 4
+                ? `極み x${this.roguelite.extremeMultiplier.toFixed(1)}`
+                : difficultyLevels[minutes];
+            UI.updateDifficultyBadge(label);
+        }
+    },
+
+    /**
+     * ローグライト: 能力効果を取得
+     */
+    getAbilityEffect(abilityId) {
+        if (this.gameMode !== 'roguelite') return null;
+
+        const level = this.roguelite.abilities[abilityId] || 0;
+        if (level === 0) return null;
+
+        const ability = this.allAbilities.find(a => a.id === abilityId);
+        if (!ability || !ability.getLevelEffect) return null;
+
+        return ability.getLevelEffect(level);
+    },
+
+    /**
+     * ローグライト: 現在のオーブ上限を取得
+     */
+    getMaxOrbs() {
+        const baseMax = this.difficultySettings[this.difficulty].maxOrbs;
+        const orbLimitEffect = this.getAbilityEffect('orbLimit');
+        return orbLimitEffect || baseMax;
+    },
+
+    /**
+     * ローグライト: オーブドロップ率ボーナスを取得
+     */
+    getOrbDropRateBonus() {
+        return this.getAbilityEffect('orbDropRate') || 0;
+    },
+
+    /**
+     * ローグライト: バー幅倍率を取得
+     */
+    getBarWidthMultiplier() {
+        return this.getAbilityEffect('barWidth') || 1;
+    },
+
+    /**
+     * ローグライト: オーブ吸収範囲を取得
+     */
+    getOrbAbsorbRadius() {
+        return this.getAbilityEffect('orbAbsorb') || 0;
+    },
+
+    /**
+     * ローグライト: ボールダメージを取得
+     */
+    getBallDamage() {
+        return this.getAbilityEffect('ballDamage') || 1;
+    },
+
+    /**
+     * ローグライト: スキルレベルを取得
+     */
+    getSkillLevel(skillId) {
+        if (this.gameMode !== 'roguelite') return 1;
+
+        const skill = this.roguelite.skills.find(s => s.id === skillId);
+        return skill ? skill.level : 1;
+    },
+
+    /**
+     * ローグライト: スキルレベル効果を取得
+     */
+    getSkillLevelEffect(skillId) {
+        const level = this.getSkillLevel(skillId);
+        const effectDef = this.skillLevelEffects[skillId];
+
+        if (!effectDef || !effectDef.getEffect) {
+            return null;
+        }
+
+        return effectDef.getEffect(level);
     },
 
     /**
@@ -617,6 +1172,11 @@ const Game = {
      * ゲーム更新
      */
     update() {
+        // ローグライト: 難易度自動更新
+        if (this.gameMode === 'roguelite') {
+            this.updateRogueliteDifficulty();
+        }
+
         this.updatePaddle();
         this.updateBalls();
         this.updateBlocks();
@@ -629,6 +1189,11 @@ const Game = {
         this.spawnBlocks();
         this.checkGameOver();
         this.updateUI();
+
+        // ローグライト: 能力獲得チェック
+        if (this.gameMode === 'roguelite') {
+            this.checkAbilityUnlock();
+        }
     },
 
 
@@ -636,6 +1201,16 @@ const Game = {
      * パドル更新
      */
     updatePaddle() {
+        // バー幅能力効果を適用
+        const baseWidth = 120;
+        const widthMultiplier = this.getBarWidthMultiplier();
+        const targetWidth = baseWidth * widthMultiplier;
+
+        // 無敵スキルによる幅変更がなければ能力効果を適用
+        if (!this.paddle.invincible) {
+            this.paddle.width = targetWidth;
+        }
+
         if (this.useMouseControl) {
             this.paddle.moveTo(this.mouseX, this.canvas.width);
         } else {
@@ -831,8 +1406,12 @@ const Game = {
                     }
                 }
 
-                // ダメージ処理
-                let damage = 1;
+                // ダメージ処理（ボール強化能力適用、分身ボールは半減）
+                let damage = this.getBallDamage();
+                // 分身ボールのダメージ半減（小数点以下切り上げ）
+                if (ball.damageMultiplier) {
+                    damage = Math.ceil(damage * ball.damageMultiplier);
+                }
                 if (ball.penetrating) {
                     damage = block.maxHp; // 貫通時は一撃破壊
                     ball.usePenetrate();
@@ -850,6 +1429,15 @@ const Game = {
                             block.y + block.height / 2
                         );
                         this.shockwaves.push(sw);
+                    }
+                }
+
+                // 爆破ボールの爆発処理
+                if (ball.explodable && ball.explodeCount > 0) {
+                    this.createExplosion(ball.x, ball.y, ball.explodeRadius);
+                    ball.explodeCount--;
+                    if (ball.explodeCount <= 0) {
+                        ball.explodable = false;
                     }
                 }
 
@@ -886,8 +1474,10 @@ const Game = {
         const scoreGain = Math.floor(baseScore * bonusMultiplier);
         this.player.score += scoreGain;
 
-        // オーブドロップ判定
-        if (Math.random() < 0.3) {
+        // オーブドロップ判定（ドロップ率ボーナス適用）
+        const baseDropRate = 0.3;
+        const dropRateBonus = this.getOrbDropRateBonus();
+        if (Math.random() < baseDropRate + dropRateBonus) {
             const orb = new Orb(block.x + block.width / 2, block.y + block.height / 2);
             this.orbs.push(orb);
         }
@@ -959,18 +1549,37 @@ const Game = {
      * オーブ更新
      */
     updateOrbs() {
-        const settings = this.difficultySettings[this.difficulty];
+        const maxOrbs = this.getMaxOrbs();
+        const absorbRadius = this.getOrbAbsorbRadius();
 
         for (let i = this.orbs.length - 1; i >= 0; i--) {
             const orb = this.orbs[i];
+
+            // オーブ吸収能力: パドル方向に吸い寄せる
+            if (absorbRadius > 0 && this.paddle) {
+                const paddleCenterX = this.paddle.x + this.paddle.width / 2;
+                const paddleCenterY = this.paddle.y;
+                const dx = paddleCenterX - orb.x;
+                const dy = paddleCenterY - orb.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // 吸収範囲内なら引き寄せる
+                const absorbRangePixels = absorbRadius * this.paddle.width;
+                if (distance < absorbRangePixels && distance > 0) {
+                    const pullStrength = 0.05 * (1 - distance / absorbRangePixels);
+                    orb.x += dx * pullStrength;
+                    orb.dy += 0.1; // 落下速度をやや増加
+                }
+            }
+
             orb.update();
 
             // パドルとの衝突
             if (orb.checkCollisionWithPaddle(this.paddle)) {
                 this.player.orbs += orb.value;
-                // オーブ上限を適用
-                if (this.player.orbs > settings.maxOrbs) {
-                    this.player.orbs = settings.maxOrbs;
+                // オーブ上限を適用（動的に取得）
+                if (this.player.orbs > maxOrbs) {
+                    this.player.orbs = maxOrbs;
                 }
                 this.orbs.splice(i, 1);
                 continue;
@@ -1305,25 +1914,32 @@ const Game = {
         const cost = this.getSkillCost('penetrate');
         if (this.player.orbs >= cost && !this.paddle.enhanced) {
             this.player.orbs -= cost;
-            this.paddle.enhance('penetrate');
+            // レベル効果: 貫通回数
+            const penetrateCount = this.getSkillLevelEffect('penetrate') || 3;
+            this.paddle.enhance('penetrate', penetrateCount);
             UI.setSkillActive('penetrate', true);
         }
     },
 
     /**
-     * 爆破スキル発動（即時発動）
+     * 爆破スキル発動
      */
     activateExplodeSkill() {
         const cost = this.getSkillCost('explode');
         if (this.player.orbs >= cost) {
             this.player.orbs -= cost;
 
-            // 全てのボールの位置で爆発
-            this.balls.forEach(ball => {
-                this.createExplosion(ball.x, ball.y);
-            });
+            // レベル効果: 爆破半径と爆破回数
+            const effect = this.getSkillLevelEffect('explode') || { radius: 3, count: 1 };
+            const explodeRadius = effect.radius * this.blockWidth;
+            const explodeCount = effect.count || 1;
 
-            // 画面を揺らすなどの演出があればここに追加
+            // 全てのボールを爆破状態に強化
+            this.balls.forEach(ball => {
+                ball.explodable = true;
+                ball.explodeRadius = explodeRadius;
+                ball.explodeCount = explodeCount;
+            });
         }
     },
 
@@ -1336,19 +1952,24 @@ const Game = {
             this.player.orbs -= cost;
 
             const newBalls = [];
-            const cloneCount = 5; // 5個増加
+            // レベル効果: 分身数
+            const cloneCount = this.getSkillLevelEffect('clone') || 5;
 
-            this.balls.forEach(ball => {
+            // 通常ボールのみを対象（分身ボールは対象外）
+            const normalBalls = this.balls.filter(ball => !ball.isClone);
+
+            normalBalls.forEach(ball => {
                 for (let i = 0; i < cloneCount; i++) {
                     const clone = new Ball(ball.x, ball.y, ball.radius);
                     clone.isClone = true;
                     clone.speed = ball.speed;
                     clone.maxSpeed = ball.maxSpeed;
+                    // 分身ボールの攻撃力は通常の半分
+                    clone.damageMultiplier = 0.5;
 
                     // 角度を散らす
-                    // 元の速度ベクトルから角度を計算し、少しずらす
                     const angle = Math.atan2(ball.dy, ball.dx);
-                    const spread = (Math.PI / 4) * (Math.random() - 0.5); // ±45度くらい
+                    const spread = (Math.PI / 4) * (Math.random() - 0.5);
                     const newAngle = angle + spread;
 
                     clone.dx = Math.cos(newAngle) * clone.speed;
@@ -1363,29 +1984,34 @@ const Game = {
                 }
             });
 
-            // 新しいボールを追加
             this.balls.push(...newBalls);
         }
     },
 
     /**
      * ビームスキル発動
-     * パドルから真上に極太レーザーを発射
+     * パドルから真上にレーザーを発射
      */
     activateBeamSkill() {
         const cost = this.getSkillCost('beam');
         if (this.player.orbs >= cost) {
             this.player.orbs -= cost;
 
-            const beamWidth = 100;
+            // レベル効果: ダメージと幅倍率
+            const effect = this.getSkillLevelEffect('beam') || { damage: 2, widthMult: 1 };
+            const beamDamage = effect.damage || 2;
+            const widthMult = effect.widthMult || 1;
+
+            // ビーム幅はバーの幅を基準
+            const beamWidth = this.paddle.width * widthMult;
             const beamX = this.paddle.x + this.paddle.width / 2;
 
-            // 範囲内のブロックを破壊
-            this.damageBlocksInRect(beamX - beamWidth / 2, 0, beamWidth, this.canvas.height, 999);
+            // 範囲内のブロックにダメージ
+            this.damageBlocksInRect(beamX - beamWidth / 2, 0, beamWidth, this.canvas.height, beamDamage);
 
             // ビームエフェクト（水色のビーム）
             if (this.beamEffects) {
-                const beam = new BeamEffect(beamX, 0, this.paddle.y);
+                const beam = new BeamEffect(beamX, 0, this.paddle.y, beamWidth);
                 this.beamEffects.push(beam);
             }
         }
@@ -1398,12 +2024,15 @@ const Game = {
         const cost = this.getSkillCost('vPenetrate');
         if (this.player.orbs >= cost) {
             this.player.orbs -= cost;
+            // レベル効果: 貫通回数
+            const penetrateCount = this.getSkillLevelEffect('vPenetrate') || 3;
 
             this.balls.forEach(ball => {
                 ball.dx = 0;
-                ball.dy = -Math.abs(ball.speed); // 真上に
+                ball.dy = -Math.abs(ball.speed);
                 ball.penetrating = true;
                 ball.penetrateCount = 0;
+                ball.maxPenetrateCount = penetrateCount;
             });
         }
     },
@@ -1415,12 +2044,15 @@ const Game = {
         const cost = this.getSkillCost('hPenetrate');
         if (this.player.orbs >= cost) {
             this.player.orbs -= cost;
+            // レベル効果: 貫通回数
+            const penetrateCount = this.getSkillLevelEffect('hPenetrate') || 3;
 
             this.balls.forEach(ball => {
                 ball.dy = 0;
-                ball.dx = ball.speed; // 真横に
+                ball.dx = ball.speed;
                 ball.penetrating = true;
                 ball.penetrateCount = 0;
+                ball.maxPenetrateCount = penetrateCount;
             });
         }
     },
@@ -1433,13 +2065,23 @@ const Game = {
         if (this.player.orbs >= cost && !this.player.invincible) {
             this.player.orbs -= cost;
             this.player.invincible = true;
-            this.paddle.invincible = true; // パドルの虹色表示を有効化
+            this.paddle.invincible = true;
 
-            // 10秒後に解除
+            // レベル効果: 時間とバー幅
+            const effect = this.getSkillLevelEffect('barInvincible') || { duration: 10, widthMult: 1 };
+            const duration = effect.duration * 1000;
+            const widthMult = effect.widthMult || 1;
+
+            // バー幅を変更
+            if (widthMult > 1) {
+                this.paddle.width = this.paddle.width * widthMult;
+            }
+
             setTimeout(() => {
                 this.player.invincible = false;
-                this.paddle.invincible = false; // パドルの虹色表示を解除
-            }, 10000);
+                this.paddle.invincible = false;
+                // バー幅を元に戻す（能力効果は残る）
+            }, duration);
         }
     },
 
@@ -1452,11 +2094,12 @@ const Game = {
         if (this.player.orbs >= cost && this.balls.length > 0) {
             this.player.orbs -= cost;
 
-            // 各ボール位置に重力場を生成
-            const wellRadius = this.blockWidth * 5; // 5ブロック分の半径
+            // レベル効果: 半径とパワー
+            const effect = this.getSkillLevelEffect('gravity') || { radius: 5, power: 1 };
+            const wellRadius = this.blockWidth * effect.radius;
 
             this.balls.forEach(ball => {
-                const well = new GravityWell(ball.x, ball.y, wellRadius);
+                const well = new GravityWell(ball.x, ball.y, wellRadius, effect.power);
                 this.gravityWells.push(well);
             });
         }
@@ -1493,8 +2136,8 @@ const Game = {
         if (this.player.orbs >= cost) {
             this.player.orbs -= cost;
 
-            // バー爆破範囲を計算（ブロック数 × (ブロック高さ + 余白)）
-            const rangeBlocks = this.skillParams.barExplodeRange;
+            // レベル効果: 爆破ブロック数
+            const rangeBlocks = this.getSkillLevelEffect('barExplode') || 3;
             const rangeHeight = rangeBlocks * (this.blockHeight + this.blockPadding);
 
             // バーの上部から指定範囲内のブロックをすべて破壊
@@ -1533,8 +2176,8 @@ const Game = {
     /**
      * 爆発を生成
      */
-    createExplosion(x, y) {
-        const explosionRadius = 150; // 爆破範囲を1.5倍に拡大
+    createExplosion(x, y, radius) {
+        const explosionRadius = radius || 150; // デフォルトは150
         this.explosions.push(new Explosion(x, y, explosionRadius));
 
         // 範囲内のブロックにダメージ
@@ -1592,7 +2235,12 @@ const Game = {
      */
     restartGame() {
         UI.hideAllOverlays();
-        this.startGame(this.difficulty);
+        // ゲームモードに応じて適切な方法でリスタート
+        if (this.gameMode === 'roguelite') {
+            this.startRogueliteGame();
+        } else {
+            this.startGame(this.difficulty);
+        }
     },
 
     /**
